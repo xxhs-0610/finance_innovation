@@ -6,3 +6,4 @@
 # faiss-cpu
 # jieba
 # rank-bm25
+streamlit>=1.37.0

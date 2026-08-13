@@ -9,10 +9,32 @@ __pycache__/
 venv/
 
 # Runtime outputs
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/qa/
+!data/raw/qa/.gitkeep
+!data/raw/nfra_page_attachments_500/
+!data/raw/nfra_page_attachments_500/.gitkeep
+data/raw/qa/*
+!data/raw/qa/.gitkeep
+data/raw/nfra_page_attachments_500/*
+!data/raw/nfra_page_attachments_500/.gitkeep
 data/parsed/*
 !data/parsed/.gitkeep
+!data/parsed/docs/
+!data/parsed/docs/.gitkeep
+!data/parsed/meta/
+!data/parsed/meta/.gitkeep
+!data/parsed/tables/
+!data/parsed/tables/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/chunks/
+!data/processed/chunks/.gitkeep
+!data/processed/eval_ready/
+!data/processed/eval_ready/.gitkeep
+!data/processed/kb/
+!data/processed/kb/.gitkeep
 indexes/*
 !indexes/.gitkeep
 data/processed/*.db

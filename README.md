@@ -1,19 +1,103 @@
 # Finance Innovation RAG
 
-面向银行业监管制度与统计报表的可信 RAG 问答系统项目骨架。
+面向“银行业监管制度与统计报表可信 RAG 问答”赛题的项目仓库。
 
-本项目按比赛链路拆成 6 个模块，方便团队成员并行开发：
+这个仓库当前的目标不是一次性塞满全部实现，而是先搭好一个适合 6 人并行协作、可持续扩展、可快速演示的工程骨架。
 
-1. 模块1：文档解析，把 Word / PDF / Excel 解析成结构化 JSONL
-2. 模块2：知识库与索引，把结构化数据切成 chunk 并建立检索索引
-3. 模块3：查询理解与混合检索，把用户问题变成证据包
-4. 模块4：生成与可信校验，基于证据生成可核验答案
-5. 模块5：API 与前端展示，提供演示系统
-6. 模块6：评测、实验与报告，证明系统效果
+## 本次更新
 
-当前已优先实现模块2的最小可运行版本：从样例 `parsed_docs.jsonl` / `parsed_tables.jsonl` 构建条款 chunk、表格 chunk、元数据库和 SQLite FTS5 检索索引。
+本次已经完成以下整理：
+
+1. 拉取并初始化项目仓库
+2. 补充比赛演示前端 `frontend/`
+3. 完善数据目录结构，新增 `data/raw / parsed / processed`
+4. 增加数据接入说明与前端说明文档
+5. 更新 `.gitignore`，避免把原始大数据、索引和运行产物直接提交到仓库
+
+## 当前项目定位
+
+围绕赛题要求，项目按 6 个模块拆分：
+
+1. 文档解析
+2. 知识库构建与索引
+3. 查询理解与混合检索
+4. 答案生成与可信校验
+5. 后端 API 与前端展示
+6. 评测、实验与报告
+
+## 项目目录
+
+```text
+app/
+  parsing/        # 模块1：文档解析
+  indexing/       # 模块2：知识库构建与索引
+  retrieval/      # 模块3：查询理解与混合检索
+  generation/     # 模块4：答案生成与可信校验
+  api/            # 模块5：后端 API
+  schemas/        # 共享数据结构
+  shared/         # 通用工具
+configs/          # 配置文件
+data/
+  raw/            # 原始数据（本地放置，大文件默认不提交）
+    qa/
+    nfra_page_attachments_500/
+  parsed/         # 模块1输出
+    docs/
+    tables/
+    meta/
+  processed/      # 模块2输出
+    chunks/
+    kb/
+    eval_ready/
+  samples/        # 最小可运行样例
+frontend/         # 比赛演示前端（Streamlit）
+indexes/          # 检索索引产物
+scripts/          # 命令行入口
+tests/            # 测试
+eval/             # 评测脚本
+reports/          # 实验报告
+slides/           # 答辩材料
+docs/             # 协作与接口文档
+```
+
+## 数据接入约定
+
+默认按以下方式接入数据：
+
+1. QA 文件放到 `data/raw/qa/`
+2. 原始监管附件放到 `data/raw/nfra_page_attachments_500/`
+3. Word/PDF 解析结果写到 `data/parsed/docs/`
+4. Excel 解析结果写到 `data/parsed/tables/`
+5. 元数据写到 `data/parsed/meta/`
+6. chunk 与知识库产物写到 `data/processed/chunks/` 和 `data/processed/kb/`
+7. 清洗后的评测集写到 `data/processed/eval_ready/`
+
+详细说明见：
+
+- `docs/module_contracts.md`
+- `docs/frontend_plan.md`
+- `docs/data_layout.md`
+
+## 当前前端说明
+
+仓库原本主要是后端与离线处理骨架，目前已经补充一个轻量的 `Streamlit` 演示前端，用于比赛阶段快速展示：
+
+1. 问题输入
+2. 回答结果
+3. 证据列表
+4. 风险提示
+
+后续如果需要更完整的产品形态，可以再升级成 `FastAPI + React` 的前后端分离结构。
 
 ## 快速开始
+
+### 1. 安装依赖
+
+```powershell
+pip install -r requirements.txt
+```
+
+### 2. 运行模块 2 的最小样例
 
 ```powershell
 python scripts/build_kb.py --sample
@@ -21,53 +105,38 @@ python scripts/search_kb.py "资本充足率" --top-k 5
 python scripts/search_kb.py "商业银行应当如何管理资本" --chunk-type clause
 ```
 
-如果你使用 Codex 内置 Python，可以替换成工作区提供的 Python 路径。
+### 3. 启动前端演示
 
-## 项目目录
-
-```text
-app/
-  parsing/       # 模块1：文档解析
-  indexing/      # 模块2：知识库构建与索引
-  retrieval/     # 模块3：查询理解与混合检索
-  generation/    # 模块4：答案生成与可信校验
-  api/           # 模块5：后端 API
-  schemas/       # 跨模块共享数据结构
-  shared/        # 通用工具
-configs/         # 配置文件
-data/
-  parsed/        # 模块1输出
-  processed/     # 模块2输出
-  samples/       # 可跑通的样例数据
-indexes/         # 检索索引
-scripts/         # 命令行入口
-tests/           # 测试
-eval/            # 模块6评测脚本
-reports/         # 实验报告
-slides/          # 答辩材料
-docs/            # 协作接口文档
+```powershell
+streamlit run frontend/app.py
 ```
 
-## 模块2交付物
+## 协作建议
 
-模块2输出这些文件给模块3使用：
+建议 6 人团队按下面方式分工：
 
-```text
-data/processed/clause_chunks.jsonl
-data/processed/table_chunks.jsonl
-data/processed/metadata.db
-indexes/bm25_corpus.jsonl
-```
+1. 数据治理与项目初始化
+2. Excel 解析与表格结构化
+3. Word/PDF 解析与条款结构化
+4. 知识库与混合检索
+5. 生成、校验与 API 编排
+6. 前端展示、评测与答辩材料
 
-其中 `metadata.db` 内包含：
+当前最适合先推进的是 Excel QA MVP，先打通：
 
-- `chunks`：所有 chunk 的元数据和原文定位
-- `chunk_fts`：用于关键词召回的全文检索表
+`Excel解析 -> 表格知识库 -> 检索 -> 回答 -> 前端展示 -> 评测`
 
-## 团队协作约定
+## 注意事项
 
-- 模块1只需要稳定输出 `data/parsed/parsed_docs.jsonl`、`data/parsed/parsed_tables.jsonl`、`data/parsed/doc_meta.jsonl`
-- 模块2不要反向修改模块1输出，只做清洗、chunk、索引和元数据挂载
-- 模块3只通过 `app.indexing.index_reader.KnowledgeBaseReader` 或约定后的检索接口读取知识库
-- 任何模块新增字段，先更新 `docs/module_contracts.md`
+1. `data/raw/` 下的真实原始数据默认不直接提交到 Git
+2. 索引、数据库和运行产物默认不提交
+3. 如果新增字段或修改模块接口，先更新 `docs/module_contracts.md`
 
+## 下一步建议
+
+推荐优先完成以下事项：
+
+1. 生成原始文件 `manifest`
+2. 把 `QA数据.xlsx` 转成统一评测格式
+3. 优先完成 Excel 解析链路
+4. 打通检索 -> 回答 -> 前端展示闭环
