@@ -1,0 +1,8 @@
+# No required third-party packages for the module-2 MVP.
+#
+# Keep the first version lightweight so teammates can run it quickly.
+# Optional future dependencies:
+# sentence-transformers
+# faiss-cpu
+# jieba
+# rank-bm25

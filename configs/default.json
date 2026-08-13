@@ -1,0 +1,13 @@
+{
+  "paths": {
+    "parsed_docs": "data/parsed/parsed_docs.jsonl",
+    "parsed_tables": "data/parsed/parsed_tables.jsonl",
+    "processed_dir": "data/processed",
+    "indexes_dir": "indexes",
+    "metadata_db": "data/processed/metadata.db"
+  },
+  "retrieval": {
+    "default_top_k": 5,
+    "keyword_backend": "sqlite_fts5"
+  }
+}
