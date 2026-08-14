@@ -13,6 +13,21 @@
 5. SQLite FTS5 关键词检索
 6. 可供模块3调用的 `KnowledgeBaseReader`
 
+## 模块1输入
+
+模块2统一通过 `configs/default.json` 消费：
+
+- `data/parsed/docs/parsed_docs.jsonl`：制度正文段落和条款
+- `data/parsed/tables/table_evidence.jsonl`：表摘要和行级表格证据
+
+模块2不直接消费完整单元格归档 `parsed_tables.jsonl`，避免将百万单元格逐个建立索引。
+
+```powershell
+python scripts/build_kb.py
+```
+
+`parsed_docs.jsonl` 可提交 Git；体积较大的 `table_evidence.jsonl` 由成员本地放入标准目录。模块2不提供第二套输入路径或样例运行模式。
+
 暂不强依赖：
 
 - FAISS

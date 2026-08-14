@@ -9,6 +9,7 @@ __pycache__/
 venv/
 
 # Runtime outputs
+/data.zip
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/qa/
@@ -27,6 +28,15 @@ data/parsed/*
 !data/parsed/meta/.gitkeep
 !data/parsed/tables/
 !data/parsed/tables/.gitkeep
+data/parsed/docs/*
+!data/parsed/docs/.gitkeep
+!data/parsed/docs/parsed_docs.jsonl
+data/parsed/tables/*
+!data/parsed/tables/.gitkeep
+data/parsed/meta/*
+!data/parsed/meta/.gitkeep
+!data/parsed/meta/doc_meta.jsonl
+!data/parsed/meta/generated_manifest.jsonl
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/chunks/

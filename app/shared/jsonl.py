@@ -13,7 +13,7 @@ def read_jsonl(path: str | Path) -> Iterator[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as file:
         for line_no, line in enumerate(file, start=1):
             line = line.strip()
-            if not line:
+            if not line or line.startswith("#"):
                 continue
             try:
                 yield json.loads(line)

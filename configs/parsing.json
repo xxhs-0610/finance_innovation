@@ -1,0 +1,25 @@
+{
+  "database": {
+    "dialect": "mysql",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "username": "root",
+    "password_env": "RAG_DB_PASSWORD",
+    "database": "finance_innovation_rag",
+    "charset": "utf8mb4"
+  },
+  "paths": {
+    "input_dir": "data/raw/nfra_page_attachments_500",
+    "parsed_docs": "data/parsed/docs/parsed_docs.jsonl",
+    "parsed_tables": "data/parsed/tables/parsed_tables.jsonl",
+    "table_evidence": "data/parsed/tables/table_evidence.jsonl",
+    "doc_meta": "data/parsed/meta/doc_meta.jsonl",
+    "manifest": "data/parsed/meta/generated_manifest.jsonl",
+    "report": "reports/module1_parsing_report.md"
+  },
+  "parsing": {
+    "parser_version": "1.0.0",
+    "cell_batch_size": 1000,
+    "pdf_ocr_text_threshold": 30
+  }
+}

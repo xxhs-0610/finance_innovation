@@ -6,7 +6,9 @@
 
 模块1输出结构化解析结果。
 
-### `data/parsed/parsed_docs.jsonl`
+所有成员统一使用 `data/parsed/` 作为模块交付路径，不设置第二套运行配置。体积可接受的正文和元数据文件提交 Git；超大表格文件被忽略后，由成员本地放回相同标准路径。
+
+### `data/parsed/docs/parsed_docs.jsonl`
 
 每行表示一个制度正文片段，至少包含：
 
@@ -24,7 +26,36 @@
 }
 ```
 
-### `data/parsed/parsed_tables.jsonl`
+### `data/parsed/tables/table_evidence.jsonl`（模块2正式输入）
+
+每行表示表摘要，或一个可检索、可回溯的表格行分段：
+
+```json
+{
+  "evidence_id": "nfra_att_032_sheet_001_row_000004_part_001",
+  "record_type": "table_row",
+  "doc_id": "nfra_att_032",
+  "title": "2025年9月全国各地区原保险保费收入情况表",
+  "sheet_name": "各地区数据（月度）",
+  "table_name": "2025年9月全国各地区原保险保费收入情况表",
+  "metric_name": "全国",
+  "period": "2025-09",
+  "unit": "亿元",
+  "cell_range": "B4:G4",
+  "values": [
+    {"header": "合计", "value": "52145.77", "cell_ref": "C4"},
+    {"header": "寿险", "value": "31707.75", "cell_ref": "E4"}
+  ],
+  "retrieval_text": "2025年9月全国各地区原保险保费收入情况表 | 全国 | 合计=52145.77；寿险=31707.75 | 单位：亿元"
+}
+```
+
+`record_type` 包含：
+
+- `table_summary`：表名、sheet、期间、单位、范围和行列规模
+- `table_row`：最多 20 个单元格组成的行级证据，保留每个值的 `cell_ref`
+
+### `data/parsed/tables/parsed_tables.jsonl`（可选审计归档）
 
 每行表示一个表格区域、指标行或单元格组，至少包含：
 
@@ -46,7 +77,9 @@
 }
 ```
 
-### `data/parsed/doc_meta.jsonl`
+该文件保留完整单元格，适合核验和重新生成证据，不作为模块2默认输入。完整数据的唯一事实源是 MySQL；需要时使用 `export-jsonl --include-cell-archive` 重新导出。
+
+### `data/parsed/meta/doc_meta.jsonl`
 
 每行表示一个源文件元数据，建议包含：
 

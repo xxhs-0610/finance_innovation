@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from app.indexing.chunk_clauses import build_clause_chunks
-from app.indexing.chunk_tables import build_table_chunks
-from app.indexing.metadata_store import build_metadata_db
-from app.shared.jsonl import read_jsonl, write_jsonl
+from app.indexing.chunk_clauses import iter_clause_chunks
+from app.indexing.chunk_tables import iter_table_chunks
+from app.indexing.metadata_store import init_db, insert_chunks
+from app.shared.jsonl import read_jsonl
 
 
 def build_kb(
@@ -25,38 +26,67 @@ def build_kb(
     processed_dir.mkdir(parents=True, exist_ok=True)
     indexes_dir.mkdir(parents=True, exist_ok=True)
 
-    doc_rows = list(read_jsonl(parsed_docs_path))
-    table_rows = list(read_jsonl(parsed_tables_path))
-    clause_chunks = build_clause_chunks(doc_rows)
-    table_chunks = build_table_chunks(table_rows)
-    all_chunks = clause_chunks + table_chunks
-
-    write_jsonl(
-        processed_dir / "clause_chunks.jsonl",
-        [chunk.to_dict() for chunk in clause_chunks],
-    )
-    write_jsonl(
-        processed_dir / "table_chunks.jsonl",
-        [chunk.to_dict() for chunk in table_chunks],
-    )
-    write_jsonl(
-        indexes_dir / "bm25_corpus.jsonl",
-        [
-            {
-                "chunk_id": chunk.chunk_id,
-                "chunk_type": chunk.chunk_type,
-                "doc_id": chunk.doc_id,
-                "text": chunk.retrieval_text,
-            }
-            for chunk in all_chunks
-        ],
-    )
-    build_metadata_db(processed_dir / "metadata.db", all_chunks)
-
-    return {
-        "parsed_docs": len(doc_rows),
-        "parsed_tables": len(table_rows),
-        "clause_chunks": len(clause_chunks),
-        "table_chunks": len(table_chunks),
-        "total_chunks": len(all_chunks),
+    stats = {
+        "parsed_docs": 0,
+        "parsed_tables": 0,
+        "clause_chunks": 0,
+        "table_chunks": 0,
+        "total_chunks": 0,
     }
+    clause_path = processed_dir / "clause_chunks.jsonl"
+    table_path = processed_dir / "table_chunks.jsonl"
+    bm25_path = indexes_dir / "bm25_corpus.jsonl"
+    con = init_db(processed_dir / "metadata.db")
+    try:
+        with (
+            clause_path.open("w", encoding="utf-8", newline="\n") as clause_file,
+            table_path.open("w", encoding="utf-8", newline="\n") as table_file,
+            bm25_path.open("w", encoding="utf-8", newline="\n") as bm25_file,
+        ):
+            def counted_rows(path: Path, key: str):
+                for row in read_jsonl(path):
+                    stats[key] += 1
+                    yield row
+
+            def all_chunks():
+                for chunk in iter_clause_chunks(counted_rows(parsed_docs_path, "parsed_docs")):
+                    stats["clause_chunks"] += 1
+                    stats["total_chunks"] += 1
+                    clause_file.write(json.dumps(chunk.to_dict(), ensure_ascii=False, sort_keys=True) + "\n")
+                    bm25_file.write(
+                        json.dumps(
+                            {
+                                "chunk_id": chunk.chunk_id,
+                                "chunk_type": chunk.chunk_type,
+                                "doc_id": chunk.doc_id,
+                                "text": chunk.retrieval_text,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
+                    yield chunk
+                for chunk in iter_table_chunks(counted_rows(parsed_tables_path, "parsed_tables")):
+                    stats["table_chunks"] += 1
+                    stats["total_chunks"] += 1
+                    table_file.write(json.dumps(chunk.to_dict(), ensure_ascii=False, sort_keys=True) + "\n")
+                    bm25_file.write(
+                        json.dumps(
+                            {
+                                "chunk_id": chunk.chunk_id,
+                                "chunk_type": chunk.chunk_type,
+                                "doc_id": chunk.doc_id,
+                                "text": chunk.retrieval_text,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    )
+                    yield chunk
+
+            insert_chunks(con, all_chunks(), batch_size=1000)
+    finally:
+        con.close()
+    return stats

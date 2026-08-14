@@ -1,7 +1,7 @@
 {
   "paths": {
-    "parsed_docs": "data/parsed/parsed_docs.jsonl",
-    "parsed_tables": "data/parsed/parsed_tables.jsonl",
+    "parsed_docs": "data/parsed/docs/parsed_docs.jsonl",
+    "parsed_tables": "data/parsed/tables/table_evidence.jsonl",
     "processed_dir": "data/processed",
     "indexes_dir": "indexes",
     "metadata_db": "data/processed/metadata.db"

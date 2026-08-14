@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from collections.abc import Iterator
 
 from app.indexing.text_utils import clean_text, join_non_empty, normalize_section_path
 from app.schemas.chunk_schema import KnowledgeChunk, SourceInfo
 
 
-def build_clause_chunks(rows: Iterable[dict]) -> list[KnowledgeChunk]:
-    chunks: list[KnowledgeChunk] = []
+def iter_clause_chunks(rows: Iterable[dict]) -> Iterator[KnowledgeChunk]:
     counters: dict[str, int] = {}
 
     for row in rows:
@@ -39,8 +39,7 @@ def build_clause_chunks(rows: Iterable[dict]) -> list[KnowledgeChunk]:
             ]
         )
         chunk_id = f"{doc_id}_clause_{counters[doc_id]:04d}"
-        chunks.append(
-            KnowledgeChunk(
+        yield KnowledgeChunk(
                 chunk_id=chunk_id,
                 chunk_type="clause",
                 doc_id=doc_id,
@@ -52,7 +51,8 @@ def build_clause_chunks(rows: Iterable[dict]) -> list[KnowledgeChunk]:
                     "clause_no": source.clause_no,
                 },
             )
-        )
 
-    return chunks
+
+def build_clause_chunks(rows: Iterable[dict]) -> list[KnowledgeChunk]:
+    return list(iter_clause_chunks(rows))
 

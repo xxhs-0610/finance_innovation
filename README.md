@@ -2,17 +2,17 @@
 
 面向“银行业监管制度与统计报表可信 RAG 问答”赛题的项目仓库。
 
-这个仓库当前的目标不是一次性塞满全部实现，而是先搭好一个适合 6 人并行协作、可持续扩展、可快速演示的工程骨架。
+仓库按 6 个模块组织，当前模块1文档解析和模块2最小知识库链路已经具备可运行实现。
 
 ## 本次更新
 
 本次已经完成以下整理：
 
-1. 拉取并初始化项目仓库
-2. 补充比赛演示前端 `frontend/`
-3. 完善数据目录结构，新增 `data/raw / parsed / processed`
-4. 增加数据接入说明与前端说明文档
-5. 更新 `.gitignore`，避免把原始大数据、索引和运行产物直接提交到仓库
+1. 实现 Word、PDF、Excel 五种文件格式的统一解析流程
+2. 新增 MySQL 规范化数据模型、增量解析、失败重试和质量报告
+3. 保留条款层级、PDF 页码、Excel 多级表头、公式、单位、期间和单元格位置
+4. 按项目目录输出模块2可直接消费的三个 JSONL 文件
+5. 补充比赛演示前端与模块2最小知识库链路
 
 ## 当前项目定位
 
@@ -49,7 +49,7 @@ data/
     chunks/
     kb/
     eval_ready/
-  samples/        # 最小可运行样例
+  samples/        # 单元测试夹具，不作为模块交付路径
 frontend/         # 比赛演示前端（Streamlit）
 indexes/          # 检索索引产物
 scripts/          # 命令行入口
@@ -74,7 +74,9 @@ docs/             # 协作与接口文档
 
 详细说明见：
 
+- `docs/模块1项目介绍与模块2对接.md`
 - `docs/module_contracts.md`
+- `docs/module1_parsing_manual.md`
 - `docs/frontend_plan.md`
 - `docs/data_layout.md`
 
@@ -97,15 +99,52 @@ docs/             # 协作与接口文档
 pip install -r requirements.txt
 ```
 
-### 2. 运行模块 2 的最小样例
+### 2. 配置并运行模块1
+
+数据库基础配置位于 `configs/parsing.json`，密码必须通过环境变量传入：
 
 ```powershell
-python scripts/build_kb.py --sample
+$env:RAG_DB_PASSWORD="你的本地MySQL密码"
+python scripts/parse_documents.py sync-raw
+python scripts/parse_documents.py init-db
+python scripts/parse_documents.py inventory
+python scripts/parse_documents.py parse --all
+python scripts/parse_documents.py export-jsonl
+python scripts/parse_documents.py report
+```
+
+模块1数据流：
+
+`data/raw -> finance_innovation_rag -> data/parsed/docs|tables|meta -> 模块2`
+
+主要输出：
+
+- `data/parsed/docs/parsed_docs.jsonl`
+- `data/parsed/tables/table_evidence.jsonl`（模块2正式输入）
+- `data/parsed/tables/parsed_tables.jsonl`（可选完整单元格归档）
+- `data/parsed/meta/doc_meta.jsonl`
+- `reports/module1_parsing_report.md`
+
+### 3. 运行模块2
+
+所有成员统一使用 `configs/default.json` 和 `data/parsed/`。模块1生成后，体积可接受的正文与元数据文件提交 Git；大体积表格文件由成员本地放到同一个标准目录：
+
+```text
+data/parsed/docs/parsed_docs.jsonl
+data/parsed/tables/table_evidence.jsonl
+```
+
+文件齐备后运行：
+
+```powershell
+python scripts/build_kb.py
 python scripts/search_kb.py "资本充足率" --top-k 5
 python scripts/search_kb.py "商业银行应当如何管理资本" --chunk-type clause
 ```
 
-### 3. 启动前端演示
+项目不提供第二套模块交付路径。`data/samples/` 仅供自动化测试使用，模块2正式运行不得读取该目录。
+
+### 4. 启动前端演示
 
 ```powershell
 streamlit run frontend/app.py
@@ -122,21 +161,23 @@ streamlit run frontend/app.py
 5. 生成、校验与 API 编排
 6. 前端展示、评测与答辩材料
 
-当前最适合先推进的是 Excel QA MVP，先打通：
+当前离线链路为：
 
-`Excel解析 -> 表格知识库 -> 检索 -> 回答 -> 前端展示 -> 评测`
+`多格式解析 -> MySQL规范化落库 -> JSONL交付 -> 知识库 -> 检索`
 
 ## 注意事项
 
-1. `data/raw/` 下的真实原始数据默认不直接提交到 Git
-2. 索引、数据库和运行产物默认不提交
-3. 如果新增字段或修改模块接口，先更新 `docs/module_contracts.md`
+1. 原始附件、超大 JSONL、数据库和索引产物默认不提交 Git
+2. `parsed_docs.jsonl`、`doc_meta.jsonl` 和 `generated_manifest.jsonl` 体积可接受，应提交 Git
+3. `table_evidence.jsonl` 和 `parsed_tables.jsonl` 体积较大，保持忽略并由成员本地放入标准目录
+4. 如果新增字段或修改模块接口，先更新 `docs/module_contracts.md`
+5. 数据库密码不得写入源码、配置文件、README 或提交记录
 
 ## 下一步建议
 
 推荐优先完成以下事项：
 
-1. 生成原始文件 `manifest`
-2. 把 `QA数据.xlsx` 转成统一评测格式
-3. 优先完成 Excel 解析链路
-4. 打通检索 -> 回答 -> 前端展示闭环
+1. 把 `QA数据.xlsx` 转成统一评测格式
+2. 基于全量解析结果优化表格 chunk 和混合检索
+3. 打通检索 -> 回答 -> 前端展示闭环
+4. 使用种子问答建立解析与检索回归测试

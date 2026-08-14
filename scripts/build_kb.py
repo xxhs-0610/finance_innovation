@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import shutil
+import json
 import sys
 from pathlib import Path
 
@@ -12,33 +12,61 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.indexing.build_kb import build_kb
 
 
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "default.json"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the module-2 knowledge base.")
-    parser.add_argument("--parsed-docs", default="data/parsed/parsed_docs.jsonl")
-    parser.add_argument("--parsed-tables", default="data/parsed/parsed_tables.jsonl")
-    parser.add_argument("--processed-dir", default="data/processed")
-    parser.add_argument("--indexes-dir", default="indexes")
     parser.add_argument(
-        "--sample",
-        action="store_true",
-        help="Copy data/samples into data/parsed before building.",
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to a module-2 JSON config (default: configs/default.json).",
     )
+    parser.add_argument("--parsed-docs", default=None, help="Override the configured document JSONL path.")
+    parser.add_argument("--parsed-tables", default=None, help="Override the configured table evidence JSONL path.")
+    parser.add_argument("--processed-dir", default=None, help="Override the configured processed output directory.")
+    parser.add_argument("--indexes-dir", default=None, help="Override the configured index output directory.")
     return parser.parse_args()
+
+
+def load_paths(config_path: Path) -> dict[str, str]:
+    if not config_path.is_absolute():
+        config_path = PROJECT_ROOT / config_path
+    if not config_path.exists():
+        raise FileNotFoundError(f"Module-2 config not found: {config_path}")
+    with config_path.open("r", encoding="utf-8") as file:
+        config = json.load(file)
+    paths = config.get("paths")
+    if not isinstance(paths, dict):
+        raise ValueError(f"Config must contain a paths object: {config_path}")
+    return paths
+
+
+def project_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def main() -> None:
     args = parse_args()
-    if args.sample:
-        Path("data/parsed").mkdir(parents=True, exist_ok=True)
-        for name in ("parsed_docs.jsonl", "parsed_tables.jsonl", "doc_meta.jsonl"):
-            shutil.copyfile(Path("data/samples") / name, Path("data/parsed") / name)
+    config_path = args.config or DEFAULT_CONFIG_PATH
+    paths = load_paths(config_path)
+
+    parsed_docs = project_path(args.parsed_docs or paths["parsed_docs"])
+    parsed_tables = project_path(args.parsed_tables or paths["parsed_tables"])
+    processed_dir = project_path(args.processed_dir or paths["processed_dir"])
+    indexes_dir = project_path(args.indexes_dir or paths["indexes_dir"])
 
     stats = build_kb(
-        args.parsed_docs,
-        args.parsed_tables,
-        processed_dir=args.processed_dir,
-        indexes_dir=args.indexes_dir,
+        parsed_docs,
+        parsed_tables,
+        processed_dir=processed_dir,
+        indexes_dir=indexes_dir,
     )
+    print(f"Config: {config_path}")
+    print(f"Documents: {parsed_docs}")
+    print(f"Tables: {parsed_tables}")
     print("Knowledge base built successfully:")
     for key, value in stats.items():
         print(f"- {key}: {value}")

@@ -57,9 +57,37 @@ def init_db(db_path: str | Path) -> sqlite3.Connection:
     return con
 
 
-def insert_chunks(con: sqlite3.Connection, chunks: Iterable[KnowledgeChunk]) -> None:
+def insert_chunks(con: sqlite3.Connection, chunks: Iterable[KnowledgeChunk], batch_size: int = 1000) -> None:
     chunk_rows = []
     fts_rows = []
+
+    def flush() -> None:
+        if not chunk_rows:
+            return
+        con.executemany(
+            """
+            INSERT INTO chunks (
+                chunk_id, chunk_type, doc_id, title, issuer, publish_date,
+                section_path, clause_no, sheet_name, table_name, source_url,
+                local_path, text, retrieval_text, metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            chunk_rows,
+        )
+        con.executemany(
+            """
+            INSERT INTO chunk_fts (
+                chunk_id, chunk_type, doc_id, title, text, retrieval_text
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            fts_rows,
+        )
+        con.commit()
+        chunk_rows.clear()
+        fts_rows.clear()
+
     for chunk in chunks:
         source = chunk.source
         metadata_json = json.dumps(chunk.metadata, ensure_ascii=False, sort_keys=True)
@@ -93,28 +121,9 @@ def insert_chunks(con: sqlite3.Connection, chunks: Iterable[KnowledgeChunk]) -> 
                 augment_for_fts(chunk.retrieval_text),
             )
         )
-
-    con.executemany(
-        """
-        INSERT INTO chunks (
-            chunk_id, chunk_type, doc_id, title, issuer, publish_date,
-            section_path, clause_no, sheet_name, table_name, source_url,
-            local_path, text, retrieval_text, metadata_json
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        chunk_rows,
-    )
-    con.executemany(
-        """
-        INSERT INTO chunk_fts (
-            chunk_id, chunk_type, doc_id, title, text, retrieval_text
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        fts_rows,
-    )
-    con.commit()
+        if len(chunk_rows) >= batch_size:
+            flush()
+    flush()
 
 
 def build_metadata_db(db_path: str | Path, chunks: Iterable[KnowledgeChunk]) -> None:
