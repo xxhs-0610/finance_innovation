@@ -99,6 +99,14 @@ docs/             # 协作与接口文档
 pip install -r requirements.txt
 ```
 
+`requirements.txt` 已包含模块2/模块3向量检索需要的 `numpy`、`sentence-transformers` 和 `faiss-cpu`。项目不要求团队成员固定使用 Conda；各成员可使用满足依赖兼容性的 Python 环境。Windows + Conda Python 3.11 仅是任务3负责人的本机开发和验证环境，不是其他模块的环境要求。
+
+如果 PyPI 网络不可用，也可以改用 Conda 备用安装方式：
+
+```powershell
+conda install --override-channels -c pytorch -c conda-forge faiss-cpu=1.11.0 numpy=1.26.4 -y
+```
+
 ### 2. 配置并运行模块1
 
 数据库基础配置位于 `configs/parsing.json`，密码必须通过环境变量传入：
@@ -144,7 +152,53 @@ python scripts/search_kb.py "商业银行应当如何管理资本" --chunk-type 
 
 项目不提供第二套模块交付路径。`data/samples/` 仅供自动化测试使用，模块2正式运行不得读取该目录。
 
-### 4. 启动前端演示
+### 4. 运行模块3
+
+模块3直接消费模块2的正式知识库和向量索引：
+
+```text
+data/processed/kb_rebuild/metadata.db
+indexes/kb_rebuild/
+```
+
+运行完整查询理解与检索管线：
+
+```powershell
+python scripts/retrieve.py "商业银行核心一级资本充足率最低要求是多少？" --top-k 5
+python scripts/retrieve.py "2025年三季度商业银行资本充足率是多少？" --top-k 5
+python scripts/evaluate_module3.py --top-k 5
+python -m unittest tests.test_module1_parsing -v
+python -m unittest tests.test_module2_smoke tests.test_module2_vector -v
+python -m unittest tests.test_module3_retrieval -v
+```
+
+Windows 下 FAISS 与 Torch 可能分别加载不同 OpenMP 运行时，因此全项目测试按上述模块分进程执行；不要用 `KMP_DUPLICATE_LIB_OK=TRUE` 绕过运行时冲突。
+
+模块3代码统一放在 `app/retrieval/`：
+
+- `query_classifier.py`：问题分类
+- `query_parser.py`：指标、日期、季度、文号、条款和运算符解析
+- `metadata_filter.py` / `entity_filter.py`：元数据和实体强约束
+- `bm25_retriever.py`：调用模块2的 FTS5/BM25 接口
+- `vector_retriever.py`：调用模块2的真实 FAISS 向量接口
+- `table_retriever.py`：按指标、报告期和表格结构二次排序
+- `table_evidence.py`：严格期间匹配与行级证据的单元格裁剪
+- `hybrid_retriever.py`：题型路由、RRF融合、故障降级和统一响应
+- `reranker.py`：可插拔成对重排序接口
+- `evidence_selector.py`：最小充分证据和来源完整性诊断
+
+默认正式路径同时启用 BM25、向量和表格专用检索。向量索引或模型不可用时，完整响应会在 `diagnostics.failures` 中记录失败通道，并保留其余召回结果。
+
+模块4正式接入应使用 `retrieve()` 的完整响应，并先处理 `answerable`、`degraded`、`needs_clarification`、`no_evidence` 四种状态。模块3能力说明与详细交接见 `docs/模块3项目介绍与模块4对接.md`。
+
+模块3交付给模块4的关键约束：
+
+- `module4_guidance.may_generate_answer=false` 时不得调用答案生成
+- 指定银行档次的阈值题必须由同档次条款证据支撑
+- 同一期间存在多个表格数值列时返回统计口径澄清，不默认选列
+- 数值、单位、条款号和单元格引用保持源数据不变
+
+### 5. 启动前端演示
 
 ```powershell
 streamlit run frontend/app.py

@@ -1,4 +1,3 @@
-#模拟数据 每一条制度正文/条款内容
 {"doc_id":"doc001","title":"商业银行资本管理办法","issuer":"国家金融监督管理总局","publish_date":"2023-11-01","source_url":"https://example.com/doc001","local_path":"data/raw/doc001.pdf","section_path":["第一章 总则","第二条"],"clause_no":"第二条","text":"商业银行应当按照本办法计量资本充足率，并建立资本充足率管理制度。"}
 {"doc_id":"doc001","title":"商业银行资本管理办法","issuer":"国家金融监督管理总局","publish_date":"2023-11-01","source_url":"https://example.com/doc001","local_path":"data/raw/doc001.pdf","section_path":["第二章 资本计量","第十条"],"clause_no":"第十条","text":"商业银行核心一级资本充足率不得低于5%，一级资本充足率不得低于6%，资本充足率不得低于8%。"}
 {"doc_id":"doc002","title":"银行业金融机构数据治理指引","issuer":"原中国银保监会","publish_date":"2018-05-21","source_url":"https://example.com/doc002","local_path":"data/raw/doc002.docx","section_path":["第三章 数据质量控制","第二十条"],"clause_no":"第二十条","text":"银行业金融机构应当建立数据质量现场检查和非现场监测机制，持续提升监管统计数据质量。"}
