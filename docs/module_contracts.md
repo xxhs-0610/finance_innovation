@@ -134,3 +134,41 @@
 }
 ```
 
+## 模块3 -> 模块4
+
+模块4直接接收上述证据列表。每条证据必须至少包含：
+
+- `chunk_id`
+- `chunk_type`
+- `text`
+- `source.doc_id`
+
+建议同时提供 `score`、完整 `source` 和表格 `metadata`，用于置信度计算与数字回溯。
+
+## 模块4 -> 模块5
+
+模块4通过 `app.generation.answer_generator.generate_answer(question, evidence)` 输出：
+
+```json
+{
+  "status": "answered",
+  "answer": "商业银行资本充足率不得低于8%。[E1]",
+  "evidence": [],
+  "risk_tips": [],
+  "confidence": 0.9,
+  "citations": ["E1"],
+  "verification": {
+    "passed": true,
+    "issues": [],
+    "unsupported_claims": []
+  }
+}
+```
+
+`status` 当前包含：
+
+- `answered`：证据充分且关键字段校验通过
+- `refused`：证据不足、明显不相关或生成内容未通过校验
+
+为兼容当前前端，`status`、`answer`、`evidence`、`risk_tips` 四个字段始终存在。模块5可进一步展示 `confidence`、`citations` 和 `verification`。
+

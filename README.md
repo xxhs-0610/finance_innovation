@@ -2,7 +2,7 @@
 
 面向“银行业监管制度与统计报表可信 RAG 问答”赛题的项目仓库。
 
-仓库按 6 个模块组织，当前模块1文档解析和模块2最小知识库链路已经具备可运行实现。
+仓库按 6 个模块组织，当前模块1文档解析、模块2最小知识库链路和模块4可信回答链路已经具备可运行实现。
 
 ## 本次更新
 
@@ -13,6 +13,7 @@
 3. 保留条款层级、PDF 页码、Excel 多级表头、公式、单位、期间和单元格位置
 4. 按项目目录输出模块2可直接消费的三个 JSONL 文件
 5. 补充比赛演示前端与模块2最小知识库链路
+6. 完成模块4证据约束生成、关键字段校验、置信度与拒答机制
 
 ## 当前项目定位
 
@@ -76,6 +77,7 @@ docs/             # 协作与接口文档
 
 - `docs/模块1项目介绍与模块2对接.md`
 - `docs/module_contracts.md`
+- `docs/模块4介绍与模块对接.md`
 - `docs/module1_parsing_manual.md`
 - `docs/frontend_plan.md`
 - `docs/data_layout.md`
@@ -149,6 +151,8 @@ python scripts/search_kb.py "商业银行应当如何管理资本" --chunk-type 
 ```powershell
 streamlit run frontend/app.py
 ```
+
+模块4无需额外模型依赖即可运行保守的抽取式回答；接入大模型时可通过 `generate_answer(..., generator=...)` 注入生成函数，最终结果仍会经过关键字段校验。详细说明见 `app/generation/README.md`。
 
 ## 协作建议
 
