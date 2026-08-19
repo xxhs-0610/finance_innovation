@@ -1,2 +1,2 @@
-"""Module 3 placeholders for query understanding and retrieval."""
+"""Module 3 query understanding, retrieval, fusion, and evidence selection."""
 

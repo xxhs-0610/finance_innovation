@@ -12,8 +12,7 @@ pywin32>=306; platform_system == "Windows"
 # Optional OCR backend. Install when PDF image pages must be recognized:
 # rapidocr_onnxruntime>=1.3.24
 
-# Optional future retrieval dependencies:
-# sentence-transformers
-# faiss-cpu
-# jieba
-# rank-bm25
+# Retrieval dependencies used by modules 2 and 3:
+sentence-transformers>=5.1.0
+# Keep the runtime aligned with the FAISS index producer's verified version.
+faiss-cpu==1.11.0

@@ -10,6 +10,8 @@ venv/
 
 # Runtime outputs
 /data.zip
+data/*.zip
+data/**/*.zip
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/qa/
@@ -51,6 +53,13 @@ data/processed/*.db
 data/processed/*.sqlite
 indexes/faiss/
 indexes/*.index
+indexes/**/*.index
+indexes/**/faiss.index
+indexes/**/embeddings.npy
+indexes/**/chunk_id_map.json
+indexes/**/vector_meta.json
+Model/*
+!Model/README.md
 logs/
 
 # Local and generated docs

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RegTrust-RAG 银行业监管制度与统计报表可信问答系统</title>
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-logo">
+          <div class="brand-icon">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+          </div>
+          <span>RegTrust-RAG</span>
+        </div>
+        <span class="badge badge-indigo">银行监管与统计报表可信问答</span>
+        <span class="badge badge-success">● 知识库已就绪 (4,892 Chunks)</span>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Role Switcher (RBAC) -->
+        <div class="role-switcher" title="切换身份体验不同权限控制">
+          <button id="roleBtnAdmin" class="role-btn active">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 5a3 3 0 0 1 6 0v3H9V6z"></path></svg>
+            管理员 (Admin)
+          </button>
+          <button id="roleBtnUser" class="role-btn">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            普通用户 (User)
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Three-Column Layout Shell -->
+    <div class="main-layout">
+      <!-- Left Sidebar (Navigation & Sessions) -->
+      <aside class="sidebar-left">
+        <!-- 1st Tier Navigation Menu -->
+        <div class="nav-section">
+          <div class="nav-title">核心功能</div>
+          <nav class="nav-menu" id="mainNavMenu">
+            <div class="nav-item active" data-view="chat">
+              <div class="nav-item-left">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <span>对话窗</span>
+              </div>
+            </div>
+
+            <div class="nav-item" data-view="import" data-admin-only="true">
+              <div class="nav-item-left">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>导入台</span>
+              </div>
+              <span class="badge badge-indigo" style="font-size:10px;">管理</span>
+            </div>
+
+            <div class="nav-item" data-view="kb" data-admin-only="true">
+              <div class="nav-item-left">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                <span>知识库管理</span>
+              </div>
+              <span class="badge badge-indigo" style="font-size:10px;">管理</span>
+            </div>
+
+            <div class="nav-item" data-view="evidence">
+              <div class="nav-item-left">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>证据审查</span>
+              </div>
+            </div>
+
+            <div class="nav-item" data-view="pipeline">
+              <div class="nav-item-left">
+                <svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                <span>模块对接</span>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        <!-- 2nd Tier History Sessions (Under Chat Window) -->
+        <div class="sessions-section">
+          <div class="sessions-header">
+            <span>历史对话窗口</span>
+            <span class="badge" id="sessionCountBadge">3</span>
+          </div>
+          <div class="session-list" id="sessionList">
+            <!-- Dynamically populated by JS -->
+          </div>
+        </div>
+
+        <!-- Left Sidebar Bottom New Window Button -->
+        <div class="sidebar-footer">
+          <button class="btn btn-primary" id="sidebarNewChatBtn" style="width:100%;">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            新建窗口
+          </button>
+        </div>
+      </aside>
+
+      <!-- Center Main Content Column -->
+      <main class="main-center">
+        <!-- Top Center Header (Synchronized on View Switch) -->
+        <div class="center-header">
+          <div class="center-title-area">
+            <div>
+              <h2 class="center-title" id="currentViewTitle">对话窗</h2>
+              <p style="font-size:12px; color:var(--text-muted); margin-top:2px;" id="currentViewDesc">
+                可信问答主交互视窗，支持制度条款定位、报表取数与双向证据追溯
+              </p>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="badge">混合检索 (BM25 + FAISS)</span>
+            <span class="badge badge-success">✓ 数字与幻觉校验开启</span>
+          </div>
+        </div>
+
+        <!-- Center Dynamic View Body -->
+        <div class="center-body">
+          <!-- VIEW 1: 对话窗 (Chat Console) -->
+          <section class="view-panel active" id="view-chat">
+            <div class="chat-container">
+              <!-- Chat Message Stream -->
+              <div class="chat-message-list" id="chatMessages">
+                <!-- Dynamically populated by ChatController -->
+              </div>
+
+              <!-- Chat Composer Area -->
+              <div class="chat-composer-area">
+                <div class="composer-input-row">
+                  <textarea id="chatInput" class="chat-textarea" placeholder="输入您的银行业监管制度或统计报表问题（按 Enter 发送，Shift+Enter 换行）..."></textarea>
+                  <button class="btn btn-primary" id="sendBtn" style="height:40px; padding:0 18px;">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    发送
+                  </button>
+                </div>
+
+                <div class="composer-controls">
+                  <div class="composer-hints">
+                    💡 提示：系统支持制度事实题、指标阈值题、表格取数题与合规性研判
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <button class="btn btn-sm btn-ghost" id="clearBtn">清空当前</button>
+                    <button class="btn btn-sm" id="newChatBtn">+ 新建会话</button>
+                  </div>
+                </div>
+
+                <!-- Sample Query Chips below Composer -->
+                <div class="sample-chips-row" id="sampleChips">
+                  <span class="sample-chip" data-query="商业银行应当如何管理资本？核心一级资本充足率和总资本充足率的监管底线分别是多少？">
+                    📌 商业银行应当如何管理资本？
+                  </span>
+                  <span class="sample-chip" data-query="资本充足率相关监管条款是什么？各级底线是多少？">
+                    📌 资本充足率相关监管条款是什么？
+                  </span>
+                  <span class="sample-chip" data-query="2025年商业银行主要监管指标情况表里，资产质量与风险抵补核心指标表现如何？">
+                    📊 2025年主要监管指标情况表分析
+                  </span>
+                  <span class="sample-chip" data-query="银行业普惠型小微企业贷款的统计口径与填报范围是什么？">
+                    📑 普惠小微企业贷款统计口径
+                  </span>
+                  <span class="sample-chip refusal" data-query="请问明天南京的天气怎么样？适合去玄武湖游玩吗？">
+                    🛡️ （演示拒答）请问明天南京天气如何？
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 2: 导入台 (Import Workbench) -->
+          <section class="view-panel" id="view-import">
+            <!-- Hidden native file picker -->
+            <input type="file" id="filePicker" multiple class="hidden" />
+
+            <!-- 4 Categorized Import Action Buttons -->
+            <div class="import-grid">
+              <div class="import-card-btn word" data-import-type="word">
+                <div class="import-icon-box">W</div>
+                <div>
+                  <strong>导入 Word</strong>
+                  <span>.doc / .docx 监管制度办法</span>
+                </div>
+              </div>
+
+              <div class="import-card-btn pdf" data-import-type="pdf">
+                <div class="import-icon-box">P</div>
+                <div>
+                  <strong>导入 PDF</strong>
+                  <span>.pdf 政策汇编与统计报告</span>
+                </div>
+              </div>
+
+              <div class="import-card-btn excel" data-import-type="excel">
+                <div class="import-icon-box">X</div>
+                <div>
+                  <strong>导入 Excel</strong>
+                  <span>.xlsx / .xls 监管指标台账</span>
+                </div>
+              </div>
+
+              <div class="import-card-btn qa" data-import-type="qa">
+                <div class="import-icon-box">Q</div>
+                <div>
+                  <strong>导入 QA</strong>
+                  <span>.xlsx / .csv 种子评测集</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Drag & Drop Zone -->
+            <div class="dropzone" id="dropzone">
+              <svg class="icon icon-lg" style="color:var(--brand-500); width:32px; height:32px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <div class="dropzone-title">拖拽文件到此处，或点击选择本地文件</div>
+              <div class="dropzone-sub">支持批量导入 Word 条款文档、PDF 监管汇编、Excel 多级报表与 QA 数据</div>
+            </div>
+
+            <!-- Historical Import Path Banner -->
+            <div class="history-path-banner">
+              <div>
+                <strong>历史导入路径：</strong>
+                <code style="font-family:var(--font-code); color:var(--brand-600);">data/raw/nfra_page_attachments_500/</code>
+              </div>
+              <span class="badge badge-success">累计已收录 218 份监管源文件</span>
+            </div>
+
+            <!-- Import Queue Panel -->
+            <div class="queue-panel">
+              <div class="queue-header">
+                <div class="queue-title">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                  <span>待处理与解析队列</span>
+                  <span class="badge badge-indigo" id="queueCount">0</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn btn-sm btn-primary" id="parseAllBtn">一键批量解析入库</button>
+                  <button class="btn btn-sm btn-ghost" id="clearQueueBtn">清空队列</button>
+                </div>
+              </div>
+
+              <div class="queue-list" id="importQueueList">
+                <!-- Dynamically populated by ImportController -->
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 3: 知识库管理 (KB Management - Admin Only) -->
+          <section class="view-panel" id="view-kb">
+            <div class="kb-table-container">
+              <div class="kb-filter-bar">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <input type="text" class="kb-search-input" id="kbSearchInput" placeholder="按文档名称、文号、分类搜索..." />
+                  <span class="badge badge-indigo">全量文档: 6</span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm btn-primary" id="rebuildIndexBtn">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                    重建全量向量与倒排索引
+                  </button>
+                </div>
+              </div>
+
+              <table class="kb-table">
+                <thead>
+                  <tr>
+                    <th>文档 ID</th>
+                    <th>文档标题 / 文号</th>
+                    <th>格式</th>
+                    <th>切片规模</th>
+                    <th>监管分类</th>
+                    <th>索引状态</th>
+                    <th>治理操作</th>
+                  </tr>
+                </thead>
+                <tbody id="kbTableBody">
+                  <!-- Dynamically populated by KBController -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- VIEW 4: 证据审查 (Evidence Review - Single Column Strict) -->
+          <section class="view-panel" id="view-evidence">
+            <div class="evidence-section">
+              <!-- Single Column Evidence List (Strictly Single Column, No side-by-side splitting) -->
+              <div class="evidence-list-container" id="evidenceListContainer">
+                <!-- Dynamically populated by EvidenceController -->
+              </div>
+
+              <!-- Dynamic Document Preview Container below Evidence List -->
+              <div class="doc-preview-container" id="docPreviewContainer">
+                <div class="doc-preview-topbar">
+                  <div class="doc-preview-title" id="previewDocTitle">
+                    <span class="badge badge-info">WORD</span>
+                    <span>商业银行资本管理办法.docx</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:11px; color:var(--text-muted);" id="previewDocMeta">国家金融监督管理总局 · 金规〔2023〕4号</span>
+                    <button class="btn btn-sm btn-primary" id="openFullDocBtn">打开该依据的原文档</button>
+                  </div>
+                </div>
+                <div class="doc-preview-body" id="previewDocBody">
+                  <!-- Dynamically rendered snippet with highlight box -->
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW 5: 模块对接 (Module Pipeline) -->
+          <section class="view-panel" id="view-pipeline">
+            <div id="pipelineView">
+              <!-- 5-Step Architecture Flow Cards -->
+              <div class="flow-container">
+                <div class="flow-step-card" data-step="1" style="cursor:pointer;">
+                  <span class="flow-step-num">步骤 1</span>
+                  <div class="flow-step-title">文件导入 (Raw)</div>
+                  <div class="flow-step-desc">Word / PDF / Excel 统一入库到 <code>data/raw/</code>。</div>
+                </div>
+
+                <div class="flow-step-card" data-step="2" style="cursor:pointer;">
+                  <span class="flow-step-num">步骤 2</span>
+                  <div class="flow-step-title">文档解析 (Parse)</div>
+                  <div class="flow-step-desc">保留条款层级与多级表头，输出至 <code>data/parsed/</code>。</div>
+                </div>
+
+                <div class="flow-step-card" data-step="3" style="cursor:pointer;">
+                  <span class="flow-step-num">步骤 3</span>
+                  <div class="flow-step-title">知识构建 (KB)</div>
+                  <div class="flow-step-desc">构建 FAISS 向量索引与 BM25 倒排索引。</div>
+                </div>
+
+                <div class="flow-step-card" data-step="4" style="cursor:pointer;">
+                  <span class="flow-step-num">步骤 4</span>
+                  <div class="flow-step-title">检索生成 (RAG)</div>
+                  <div class="flow-step-desc">意图识别、混合重排、数字与幻觉校验。</div>
+                </div>
+
+                <div class="flow-step-card" data-step="5" style="cursor:pointer;">
+                  <span class="flow-step-num">步骤 5</span>
+                  <div class="flow-step-title">前端与评测 (UI)</div>
+                  <div class="flow-step-desc">多会话交互、单列证据溯源与 42 题种子回归。</div>
+                </div>
+              </div>
+
+              <!-- Module Integration Cards -->
+              <div class="pipeline-cards-grid">
+                <div class="pipeline-module-card">
+                  <div class="pipeline-module-title">
+                    <span>模块 1：文档与表格解析</span>
+                    <span class="badge badge-success">✓ 运行正常</span>
+                  </div>
+                  <div class="pipeline-item-list">
+                    <div>• Word/PDF: 章节、条款、段落编号提取</div>
+                    <div>• Excel: 多级表头、行列对齐、单元格坐标</div>
+                    <div>• 交付物: <code>parsed_docs.jsonl</code>, <code>table_evidence.jsonl</code></div>
+                  </div>
+                </div>
+
+                <div class="pipeline-module-card">
+                  <div class="pipeline-module-title">
+                    <span>模块 2-3：知识库与混合检索</span>
+                    <span class="badge badge-success">✓ 运行正常</span>
+                  </div>
+                  <div class="pipeline-item-list">
+                    <div>• 倒排索引: BM25 (精准条款文号召回)</div>
+                    <div>• 向量索引: FAISS (768维语义嵌入召回)</div>
+                    <div>• 精重排: BGE-Reranker (Top 3~5 证据包)</div>
+                  </div>
+                </div>
+
+                <div class="pipeline-module-card">
+                  <div class="pipeline-module-title">
+                    <span>模块 4-6：生成校验与评测</span>
+                    <span class="badge badge-success">✓ 运行正常</span>
+                  </div>
+                  <div class="pipeline-item-list">
+                    <div>• 事后校验: 实体数值、日期、强弱规范词</div>
+                    <div>• 拒答机制: 低置信度与库外问题主动拒绝</div>
+                    <div>• 评测回放: 42 条种子问答 100% 达标</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- Right Context & Status Column (Synchronized per View) -->
+      <aside class="sidebar-right">
+        <!-- Chat Context Widget -->
+        <div class="right-card right-view-panel" data-for-view="chat">
+          <div class="right-card-title">
+            <span>实时问答质检与检索指标</span>
+            <span class="badge badge-indigo">Online</span>
+          </div>
+          <div id="chatRightContext">
+            <!-- Populated by ChatController -->
+          </div>
+        </div>
+
+        <!-- Import Context Widget -->
+        <div class="right-card right-view-panel hidden" data-for-view="import">
+          <div class="right-card-title">
+            <span>数据存储与解析引擎</span>
+            <span class="badge badge-success">就绪</span>
+          </div>
+          <div class="right-stat-grid">
+            <div class="right-stat-item"><div class="right-stat-label">原始文件 (raw)</div><div class="right-stat-value">218 份</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">结构化解析</div><div class="right-stat-value">100%</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">总切片 Chunks</div><div class="right-stat-value">4,892</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">解析吞吐率</div><div class="right-stat-value">45 页/秒</div></div>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-muted); line-height:1.5;">
+            统一落库路径规范：<br/>
+            • <code>data/raw/nfra_page_attachments_500/</code><br/>
+            • <code>data/parsed/docs/</code> & <code>tables/</code>
+          </div>
+        </div>
+
+        <!-- Evidence Context Widget -->
+        <div class="right-card right-view-panel hidden" data-for-view="evidence">
+          <div class="right-card-title">
+            <span>依据溯源与合规链条</span>
+            <span class="badge badge-indigo">Audit</span>
+          </div>
+          <div id="evidenceRightContext">
+            <!-- Populated by EvidenceController -->
+          </div>
+        </div>
+
+        <!-- Knowledge Base Context Widget -->
+        <div class="right-card right-view-panel hidden" data-for-view="kb">
+          <div class="right-card-title">
+            <span>知识库健康度</span>
+            <span class="badge badge-success">正常</span>
+          </div>
+          <div class="right-stat-grid">
+            <div class="right-stat-item"><div class="right-stat-label">制度类 (Word/PDF)</div><div class="right-stat-value">150 篇</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">统计报表 (Excel)</div><div class="right-stat-value">68 张</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">向量维度</div><div class="right-stat-value">768 维</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">索引覆盖率</div><div class="right-stat-value">100%</div></div>
+          </div>
+        </div>
+
+        <!-- Pipeline Context Widget -->
+        <div class="right-card right-view-panel hidden" data-for-view="pipeline">
+          <div class="right-card-title">
+            <span>全链路评测基准</span>
+            <span class="badge badge-success">通过</span>
+          </div>
+          <div class="right-stat-grid">
+            <div class="right-stat-item"><div class="right-stat-label">种子问答通过率</div><div class="right-stat-value" style="color:var(--success-text);">100%</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">Top-3 证据召回率</div><div class="right-stat-value">94.2%</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">平均检索耗时</div><div class="right-stat-value">64 ms</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">生成耗时</div><div class="right-stat-value">360 ms</div></div>
+          </div>
+        </div>
+
+        <!-- Global System Specs Card in Right Sidebar -->
+        <div class="right-card">
+          <div class="right-card-title">
+            <span>系统技术规范</span>
+            <span class="badge">v2.1</span>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
+            <div>• <strong>架构模型</strong>: 混合检索 (BM25 + FAISS)</div>
+            <div>• <strong>防幻觉机制</strong>: 结构化事实约束与事后比对</div>
+            <div>• <strong>拒答机制</strong>: 库外及低置信度 (<0.7) 自动拒答</div>
+            <div>• <strong>权限模式</strong>: RBAC 双角色动态分权</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+  </div>
+
+  <!-- JavaScript Modules Bootstrap -->
+  <script src="js/state.js"></script>
+  <script src="js/mock_service.js"></script>
+  <script src="js/api_service.js"></script>
+  <script src="js/controllers/chat_controller.js"></script>
+  <script src="js/controllers/import_controller.js"></script>
+  <script src="js/controllers/kb_controller.js"></script>
+  <script src="js/controllers/evidence_controller.js"></script>
+  <script src="js/controllers/pipeline_controller.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

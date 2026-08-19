@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+from app.api.main import ask
 from app.generation.answer_generator import generate_answer
 from app.generation.prompt_builder import build_generation_prompt
 from app.generation.verifier import extract_numeric_claims, verify_answer
@@ -128,6 +130,143 @@ class Module4GenerationTest(unittest.TestCase):
         self.assertIn("[E1]", prompt)
         self.assertIn("只能使用给定证据回答", prompt)
         self.assertIn('"status":"answered|refused"', prompt)
+
+    def test_full_retrieval_response_answerable_is_consumed(self) -> None:
+        response = {
+            "status": "answerable",
+            "evidence": [clause_evidence("商业银行资本充足率不得低于8%。")],
+            "module4_guidance": {
+                "action": "answer",
+                "may_generate_answer": True,
+                "require_citations": True,
+            },
+            "diagnostics": {"failures": []},
+        }
+
+        result = generate_answer("资本充足率最低要求是多少？", response)
+
+        self.assertEqual(result["status"], "answered")
+        self.assertEqual(result["retrieval_status"], "answerable")
+        self.assertEqual(result["module4_guidance"]["action"], "answer")
+
+    def test_clarification_status_is_preserved_without_generation(self) -> None:
+        response = {
+            "status": "needs_clarification",
+            "evidence": [],
+            "module4_guidance": {
+                "action": "clarify",
+                "may_generate_answer": False,
+                "clarification_question": "请选择财产险或人身险。",
+                "clarification_options": ["财产险", "人身险"],
+            },
+            "diagnostics": {},
+        }
+
+        result = generate_answer("2025年保费收入是多少？", response)
+
+        self.assertEqual(result["status"], "needs_clarification")
+        self.assertEqual(result["clarification_options"], ["财产险", "人身险"])
+        self.assertEqual(result["answer"], "请选择财产险或人身险。")
+
+    def test_no_evidence_status_is_not_converted_to_clarification(self) -> None:
+        response = {
+            "status": "no_evidence",
+            "evidence": [],
+            "module4_guidance": {
+                "action": "refuse",
+                "may_generate_answer": False,
+                "reason": "no_reliable_evidence",
+            },
+            "diagnostics": {},
+        }
+
+        result = generate_answer("不存在年份的指标是多少？", response)
+
+        self.assertEqual(result["status"], "no_evidence")
+        self.assertIn("no_reliable_evidence", result["refusal_reason"])
+        self.assertNotIn("clarification_question", result)
+
+    def test_degraded_status_adds_failure_warning(self) -> None:
+        response = {
+            "status": "degraded",
+            "evidence": [clause_evidence("商业银行资本充足率不得低于8%。")],
+            "module4_guidance": {
+                "action": "answer_with_warning",
+                "may_generate_answer": True,
+            },
+            "diagnostics": {
+                "failures": [
+                    {"stage": "retrieval", "component": "vector", "error_type": "RuntimeError"}
+                ]
+            },
+        }
+
+        result = generate_answer("资本充足率最低要求是多少？", response)
+
+        self.assertEqual(result["status"], "degraded")
+        self.assertTrue(any("vector" in tip for tip in result["risk_tips"]))
+
+    def test_incomplete_evidence_quality_is_refused(self) -> None:
+        evidence = clause_evidence("商业银行资本充足率不得低于8%。")
+        evidence["metadata"] = {
+            "evidence_quality": {"complete": False, "missing_fields": ["source_url"]}
+        }
+
+        result = generate_answer("资本充足率最低要求是多少？", [evidence])
+
+        self.assertEqual(result["status"], "refused")
+        self.assertIn("来源字段不完整", result["refusal_reason"])
+
+    def test_ratio_conversion_preserves_source_value(self) -> None:
+        evidence = {
+            "chunk_id": "table1",
+            "chunk_type": "table",
+            "score": 1.0,
+            "text": "资本充足率 2025Q3 原值 0.15359",
+            "source": {
+                "doc_id": "doc101",
+                "title": "监管统计指标",
+                "sheet_name": "资本指标",
+                "table_name": "主要监管指标",
+                "cell_ref": "D44",
+            },
+            "metadata": {
+                "metric_name": "资本充足率",
+                "period": "2025Q3",
+                "unit": "%",
+                "value": "0.15359",
+                "value_numeric": "0.153590000000000000",
+                "evidence_quality": {"complete": True, "missing_fields": []},
+            },
+        }
+
+        result = generate_answer("2025年三季度资本充足率百分比是多少？", [evidence])
+
+        self.assertEqual(result["status"], "answered")
+        self.assertIn("15.359%", result["answer"])
+        self.assertIn("0.153590000000000000", result["answer"])
+        derived = result["evidence"][0]["metadata"]["derived_values"][0]
+        self.assertEqual(derived["source_value"], "0.153590000000000000")
+        self.assertEqual(derived["display_value"], "15.359%")
+
+    def test_api_uses_full_retrieval_response(self) -> None:
+        response = {
+            "status": "needs_clarification",
+            "evidence": [],
+            "module4_guidance": {
+                "action": "clarify",
+                "may_generate_answer": False,
+                "clarification_question": "请补充具体指标。",
+            },
+            "diagnostics": {},
+        }
+
+        with patch("app.api.main.retrieve", return_value=response) as mocked:
+            result = ask("2025年三季度是多少？")
+
+        mocked.assert_called_once_with("2025年三季度是多少？")
+        self.assertEqual(result["status"], "needs_clarification")
+        self.assertEqual(result["answer"], "请补充具体指标。")
 
 
 if __name__ == "__main__":

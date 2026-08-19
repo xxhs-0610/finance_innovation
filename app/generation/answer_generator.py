@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from collections.abc import Mapping
+from copy import deepcopy
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.generation.refusal import assess_evidence_sufficiency, build_refusal
 from app.generation.verifier import verify_answer
-from app.schemas.answer_schema import AnswerResult, normalize_evidence
+from app.schemas.answer_schema import (
+    AnswerResult,
+    normalize_evidence,
+    normalize_retrieval_response,
+)
 
 
 Generator = Callable[[str, list[dict[str, Any]]], str]
@@ -13,7 +20,7 @@ Generator = Callable[[str, list[dict[str, Any]]], str]
 
 def generate_answer(
     question: str,
-    evidence: list[dict[str, Any]],
+    evidence: Any,
     *,
     generator: Generator | None = None,
     min_evidence_overlap: int = 1,
@@ -25,7 +32,28 @@ def generate_answer(
     offline and has deterministic regression tests.
     """
 
-    normalized = normalize_evidence(evidence)
+    retrieval = normalize_retrieval_response(evidence)
+    retrieval_status = ""
+    retrieval_guidance: dict[str, Any] = {}
+    retrieval_diagnostics: dict[str, Any] = {}
+    if retrieval is not None:
+        normalized = retrieval["evidence"]
+        retrieval_status = str(retrieval.get("status") or "")
+        retrieval_guidance = retrieval["module4_guidance"]
+        retrieval_diagnostics = retrieval["diagnostics"]
+        gated = _handle_retrieval_gate(
+            question,
+            normalized,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
+        if gated is not None:
+            return gated
+    else:
+        normalized = normalize_evidence(evidence)
+
+    normalized = _add_deterministic_table_derivations(normalized, question)
     sufficiency = assess_evidence_sufficiency(
         question,
         normalized,
@@ -34,14 +62,24 @@ def generate_answer(
     if not sufficiency.sufficient:
         refusal = build_refusal(question, sufficiency.reasons, normalized)
         refusal["verification"]["sufficiency"] = sufficiency.to_dict()
-        return refusal
+        return _attach_retrieval_context(
+            refusal,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
 
     try:
         generated = (generator or _extractive_generator)(str(question or "").strip(), normalized)
     except Exception:
         refusal = build_refusal(question, ["答案生成服务调用失败。"], normalized)
         refusal["verification"]["sufficiency"] = sufficiency.to_dict()
-        return refusal
+        return _attach_retrieval_context(
+            refusal,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
     answer_text = str(generated or "").strip()
     verification = verify_answer(answer_text, normalized, question=question)
     risk_tips: list[str] = []
@@ -56,6 +94,9 @@ def generate_answer(
     elif _has_multiple_scopes(normalized):
         risk_tips.append("证据来自不同文档或期间，使用前请确认适用范围和时点。")
 
+    if retrieval_status == "degraded":
+        risk_tips.append(_degraded_risk_tip(retrieval_diagnostics))
+
     citations = verification.get("citations") or [item["citation_id"] for item in normalized]
     confidence = _estimate_confidence(normalized, verification, sufficiency.overlap)
     result = AnswerResult(
@@ -69,7 +110,131 @@ def generate_answer(
         refusal_reason=refusal_reason,
         question=str(question or "").strip(),
     )
-    return result.to_dict()
+    payload = result.to_dict()
+    if retrieval_status:
+        payload["status"] = "degraded" if retrieval_status == "degraded" and status == "answered" else payload["status"]
+    return _attach_retrieval_context(
+        payload,
+        retrieval_status,
+        retrieval_guidance,
+        retrieval_diagnostics,
+    )
+
+
+def _handle_retrieval_gate(
+    question: str,
+    evidence: list[dict[str, Any]],
+    retrieval_status: str,
+    guidance: dict[str, Any],
+    diagnostics: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Honor module 3's answerability decision before any generation."""
+
+    action = str(guidance.get("action") or "")
+    may_generate = guidance.get("may_generate_answer")
+    if may_generate is None:
+        may_generate = retrieval_status in {"answerable", "degraded"} and bool(evidence)
+
+    if retrieval_status == "no_evidence" or action == "refuse":
+        refusal = build_refusal(
+            question,
+            [str(guidance.get("reason") or "模块3未找到足够的可靠证据。")],
+            evidence,
+        )
+        refusal["status"] = "no_evidence" if retrieval_status == "no_evidence" else "refused"
+        return _attach_retrieval_context(
+            refusal, retrieval_status, guidance, diagnostics
+        )
+
+    if retrieval_status == "needs_clarification" or action == "clarify" or not may_generate:
+        clarification = str(guidance.get("clarification_question") or "请补充问题中的适用对象或查询条件。")
+        options = guidance.get("clarification_options")
+        payload = {
+            "status": "needs_clarification",
+            "answer": clarification,
+            "evidence": evidence,
+            "risk_tips": ["信息条件不足，系统未生成确定性答案。"],
+            "confidence": 0.0,
+            "citations": [],
+            "verification": {
+                "passed": False,
+                "issues": ["模块3要求先澄清问题条件。"],
+                "sufficiency": {"sufficient": False, "reasons": ["模块3要求先澄清问题条件。"]},
+            },
+            "clarification_question": clarification,
+            "question": str(question or "").strip(),
+        }
+        if isinstance(options, list) and options:
+            payload["clarification_options"] = options
+        return _attach_retrieval_context(
+            payload, retrieval_status, guidance, diagnostics
+        )
+
+    return None
+
+
+def _attach_retrieval_context(
+    payload: dict[str, Any],
+    retrieval_status: str,
+    guidance: dict[str, Any],
+    diagnostics: dict[str, Any],
+) -> dict[str, Any]:
+    if retrieval_status:
+        payload["retrieval_status"] = retrieval_status
+        payload["module4_guidance"] = guidance
+        payload["diagnostics"] = diagnostics
+    return payload
+
+
+def _degraded_risk_tip(diagnostics: dict[str, Any]) -> str:
+    failures = diagnostics.get("failures") if isinstance(diagnostics, Mapping) else None
+    if isinstance(failures, list) and failures:
+        components = [str(item.get("component")) for item in failures if isinstance(item, Mapping) and item.get("component")]
+        if components:
+            return f"检索链路部分降级（{', '.join(components)}），答案仅基于当前可用证据生成。"
+    return "检索链路部分降级，答案仅基于当前可用证据生成。"
+
+
+def _add_deterministic_table_derivations(
+    evidence: list[dict[str, Any]], question: str
+) -> list[dict[str, Any]]:
+    """Record safe ratio conversions without overwriting source values."""
+
+    wants_ratio = any(marker in str(question or "") for marker in ("百分比", "百分率", "占比", "比例", "率"))
+    if not wants_ratio:
+        return evidence
+    output: list[dict[str, Any]] = []
+    for item in evidence:
+        record = deepcopy(item)
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        metadata = dict(metadata)
+        metric = str(metadata.get("metric_name") or "")
+        unit = str(metadata.get("unit") or "")
+        raw = metadata.get("value_numeric", metadata.get("value"))
+        if "率" in metric or "比例" in metric or "占比" in metric:
+            converted = _ratio_as_percent(raw, unit)
+            if converted is not None:
+                metadata.setdefault("derived_values", []).append({
+                    "kind": "ratio_to_percent",
+                    "source_value": str(raw),
+                    "display_value": converted,
+                    "explanation": f"保留原值 {raw}，按百分比展示为 {converted}。",
+                })
+        record["metadata"] = metadata
+        output.append(record)
+    return output
+
+
+def _ratio_as_percent(raw: Any, unit: str) -> str | None:
+    if "%" not in unit and "％" not in unit:
+        return None
+    try:
+        value = Decimal(str(raw))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not Decimal("-1") <= value <= Decimal("1") or value == 0:
+        return None
+    return f"{(value * 100).normalize():f}%"
 
 
 def _extractive_generator(question: str, evidence: list[dict[str, Any]]) -> str:
@@ -82,7 +247,7 @@ def _extractive_generator(question: str, evidence: list[dict[str, Any]]) -> str:
         return metadata_answer
     lines: list[str] = []
     for item in evidence[:3]:
-        text = str(item.get("text") or "").strip().rstrip("。；;")
+        text = _evidence_text_for_answer(item)
         if not text:
             continue
         citation = item.get("citation_id", "E1")
@@ -98,6 +263,20 @@ def _extractive_generator(question: str, evidence: list[dict[str, Any]]) -> str:
     return "结论：结合检索到的证据，相关信息如下：\n" + "\n".join(
         f"{idx}. {line}" for idx, line in enumerate(lines, start=1)
     )
+
+
+def _evidence_text_for_answer(item: dict[str, Any]) -> str:
+    text = str(item.get("text") or "").strip().rstrip("。；;")
+    derived = (item.get("metadata") or {}).get("derived_values", [])
+    if isinstance(derived, list):
+        explanations = [
+            str(value.get("explanation"))
+            for value in derived
+            if isinstance(value, Mapping) and value.get("explanation")
+        ]
+        if explanations:
+            text = f"{text}（{'；'.join(explanations)}）"
+    return text
 
 
 def _answer_metadata_question(question: str, evidence: list[dict[str, Any]]) -> str | None:

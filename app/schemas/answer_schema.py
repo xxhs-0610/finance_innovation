@@ -8,6 +8,7 @@ future FastAPI route without requiring a new runtime dependency.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Mapping
 from typing import Any
 
 
@@ -88,4 +89,44 @@ def normalize_evidence(evidence: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-__all__ = ["AnswerResult", "AnswerStatus", "normalize_evidence"]
+def normalize_retrieval_response(response: Any) -> dict[str, Any] | None:
+    """Normalize module 3's full response without importing retrieval code.
+
+    The helper accepts a ``RetrievalResponse`` dataclass, its serialized
+    dictionary form, or any compatible object exposing ``to_dict``. A plain
+    evidence list intentionally returns ``None`` because it is the legacy
+    compatibility input and has no retrieval status or guidance.
+    """
+
+    if response is None or isinstance(response, (list, tuple)):
+        return None
+    if hasattr(response, "to_dict"):
+        response = response.to_dict()
+    elif hasattr(response, "status") and hasattr(response, "evidence"):
+        response = {
+            "status": getattr(response, "status", ""),
+            "evidence": getattr(response, "evidence", []),
+            "module4_guidance": getattr(response, "module4_guidance", {}),
+            "diagnostics": getattr(response, "diagnostics", {}),
+            "analysis": getattr(response, "analysis", {}),
+            "query": getattr(response, "query", ""),
+        }
+    if not isinstance(response, Mapping):
+        return None
+    data = dict(response)
+    if "evidence" not in data:
+        return None
+    data["evidence"] = normalize_evidence(data.get("evidence"))
+    guidance = data.get("module4_guidance")
+    data["module4_guidance"] = dict(guidance) if isinstance(guidance, Mapping) else {}
+    diagnostics = data.get("diagnostics")
+    data["diagnostics"] = dict(diagnostics) if isinstance(diagnostics, Mapping) else {}
+    return data
+
+
+__all__ = [
+    "AnswerResult",
+    "AnswerStatus",
+    "normalize_evidence",
+    "normalize_retrieval_response",
+]

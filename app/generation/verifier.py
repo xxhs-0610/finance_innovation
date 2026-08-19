@@ -159,6 +159,8 @@ def _search_text(item: dict[str, Any]) -> str:
     metadata = item.get("metadata") or {}
     values = metadata.get("values") if isinstance(metadata.get("values"), list) else []
     value_text = " ".join(str(value) for value in values)
+    derived_values = metadata.get("derived_values") if isinstance(metadata.get("derived_values"), list) else []
+    derived_text = " ".join(str(value) for value in derived_values)
     fields = [
         item.get("text"),
         item.get("retrieval_text"),
@@ -176,6 +178,7 @@ def _search_text(item: dict[str, Any]) -> str:
         metadata.get("unit"),
         metadata.get("value"),
         value_text,
+        derived_text,
     ]
     return _normalize_for_match(" ".join(str(field or "") for field in fields))
 

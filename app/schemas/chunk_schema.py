@@ -7,7 +7,7 @@ from typing import Any, Literal
 ChunkType = Literal["clause", "table"]
 
 
-@dataclass(slots=True)
+@dataclass
 class SourceInfo:
     doc_id: str
     title: str = ""
@@ -22,7 +22,7 @@ class SourceInfo:
     cell_ref: str = ""
 
 
-@dataclass(slots=True)
+@dataclass
 class KnowledgeChunk:
     chunk_id: str
     chunk_type: ChunkType
@@ -50,7 +50,7 @@ class KnowledgeChunk:
         return data
 
 
-@dataclass(slots=True)
+@dataclass
 class SearchResult:
     chunk_id: str
     chunk_type: ChunkType
@@ -61,4 +61,3 @@ class SearchResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-

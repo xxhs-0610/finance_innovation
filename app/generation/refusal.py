@@ -56,6 +56,14 @@ def assess_evidence_sufficiency(
     if all(not str(item.get("source", {}).get("doc_id") or "").strip() for item in records):
         reasons.append("证据缺少可追溯的文档标识。")
 
+    explicit_quality = [
+        (item.get("metadata") or {}).get("evidence_quality", {}).get("complete")
+        for item in records
+        if isinstance((item.get("metadata") or {}).get("evidence_quality"), dict)
+    ]
+    if explicit_quality and not any(value is True for value in explicit_quality):
+        reasons.append("证据来源字段不完整，无法形成可靠引用。")
+
     return SufficiencyResult(not reasons, overlap=overlap, reasons=reasons)
 
 
