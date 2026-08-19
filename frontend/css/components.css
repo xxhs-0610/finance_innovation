@@ -720,6 +720,8 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .kb-filter-bar {
@@ -752,6 +754,13 @@
   font-size: 12.5px;
 }
 
+.kb-table-scroll-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 280px;
+  max-height: calc(100vh - 240px);
+}
+
 .kb-table th {
   background: var(--bg-subtle);
   color: var(--text-muted);
@@ -759,6 +768,9 @@
   padding: 9px 14px;
   border-bottom: 1px solid var(--border-light);
   font-size: 11.5px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .kb-table td {
@@ -769,6 +781,62 @@
 
 .kb-table tr:hover td {
   background: var(--bg-subtle);
+}
+
+.kb-pagination-bar {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-panel);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.kb-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kb-page-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.kb-page-btn:hover {
+  background: var(--bg-subtle);
+  border-color: var(--brand-300);
+}
+
+.kb-page-btn.active {
+  background: var(--brand-600);
+  color: #ffffff;
+  border-color: var(--brand-600);
+}
+
+.kb-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ---------------- Toast & Modal ---------------- */

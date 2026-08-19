@@ -296,10 +296,11 @@
 
 .center-body {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .view-panel {
@@ -307,8 +308,17 @@
   flex: 1;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   padding: 16px 20px 20px;
+  overflow: hidden;
+  box-sizing: border-box;
   animation: fadeIn 0.2s ease-in-out;
+}
+
+.view-panel#view-chat,
+.view-panel#view-import,
+.view-panel#view-pipeline {
+  overflow-y: auto;
 }
 
 .view-panel.active {
