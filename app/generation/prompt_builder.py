@@ -37,13 +37,28 @@ def build_generation_prompt(
         ]
         source_text = " | ".join(str(bit).strip() for bit in source_bits if str(bit or "").strip())
         text = item["text"][:max_evidence_chars]
-        blocks.append(f"[{item['citation_id']}] 来源：{source_text or '未提供'}\n内容：{text}")
+        derived_values = metadata.get("derived_values")
+        derived_text = ""
+        if isinstance(derived_values, list):
+            explanations = [
+                str(value.get("explanation"))
+                for value in derived_values
+                if isinstance(value, dict) and value.get("explanation")
+            ]
+            if explanations:
+                derived_text = "\n确定性换算：" + "；".join(explanations)
+        blocks.append(
+            f"[{item['citation_id']}] 来源：{source_text or '未提供'}\n"
+            f"内容：{text}{derived_text}"
+        )
 
     evidence_text = "\n\n".join(blocks) or "（无可用证据）"
     return (
         f"系统指令：\n{SYSTEM_INSTRUCTION}\n\n"
         f"用户问题：\n{str(question or '').strip()}\n\n"
         f"证据包：\n{evidence_text}\n\n"
+        "表格证据如包含“确定性换算”，必须原样优先使用换算后的展示值；"
+        "不得给原始存储值直接添加百分号。\n"
         "请输出 JSON：{\"status\":\"answered|refused\",\"answer\":\"...\","
         "\"citations\":[\"E1\"],\"risk_tips\":[\"...\"]}"
     )

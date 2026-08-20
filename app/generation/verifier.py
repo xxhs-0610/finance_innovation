@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 from app.schemas.answer_schema import normalize_evidence
@@ -43,8 +43,12 @@ def verify_answer(
     evidence_text = " ".join(_search_text(item) for item in records)
     normalized_evidence = _normalize_for_match(evidence_text)
 
-    numeric_claims = _extract_claims(NUMBER_RE, text, _normalize_number_claim)
     date_claims = _extract_claims(DATE_RE, text, _normalize_date_claim)
+    numeric_claims = [
+        claim
+        for claim in _extract_claims(NUMBER_RE, text, _normalize_number_claim)
+        if not any(claim["raw"] in date_claim["raw"] for date_claim in date_claims)
+    ]
     modality_claims = _extract_claims(MODAL_RE, text, lambda value: value)
     document_no_claims = _extract_claims(DOC_NO_RE, text, _normalize_for_match)
     institution_claims = _extract_institution_claims(text)
@@ -124,13 +128,23 @@ def _extract_institution_claims(text: str) -> list[dict[str, str]]:
     claims: list[dict[str, str]] = []
     seen: set[str] = set()
     for match in sorted(matches, key=lambda item: item.start()):
-        raw = match.group(0).strip()
+        raw = _strip_temporal_institution_prefix(match.group(0).strip())
         normalized = _normalize_for_match(raw)
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)
         claims.append({"kind": "institution", "raw": raw, "normalized": normalized})
     return claims
+
+
+def _strip_temporal_institution_prefix(value: str) -> str:
+    """Prevent a nearby reporting period from becoming part of a bank name."""
+
+    return re.sub(
+        r"^(?:年)?(?:(?:第)?[一二三四1234]季度|上半年|下半年|年末|年度)?",
+        "",
+        value,
+    ) or value
 
 
 def _is_list_marker(text: str, start: int, end: int, raw: str) -> bool:
@@ -149,7 +163,9 @@ def _claim_supported(raw: str, normalized: str, evidence_text: str, *, kind: str
             for candidate in NUMBER_RE.findall(evidence_text):
                 candidate_normalized = _normalize_number_claim(candidate)
                 candidate_number = _numeric_value(candidate_normalized)
-                if candidate_number == number and _unit_of(normalized) == _unit_of(candidate_normalized):
+                if _unit_of(normalized) != _unit_of(candidate_normalized):
+                    continue
+                if _numeric_values_match(number, candidate_number, normalized, candidate_normalized):
                     return True
     return normalized in evidence_text or _normalize_for_match(raw) in evidence_text
 
@@ -202,7 +218,18 @@ def _normalize_number_claim(value: str) -> str:
 
 
 def _normalize_date_claim(value: str) -> str:
-    return _normalize_for_match(value).replace("/", "-").replace(".", "-")
+    text = _normalize_for_match(value).replace("/", "-").replace(".", "-")
+    quarter_match = re.fullmatch(
+        r"(?P<year>20\d{2})年(?:第)?(?P<quarter>[一二三四1234])季度",
+        text,
+    )
+    if quarter_match:
+        quarter_map = {"一": "1", "二": "2", "三": "3", "四": "4"}
+        quarter = quarter_map.get(
+            quarter_match.group("quarter"), quarter_match.group("quarter")
+        )
+        return f"{quarter_match.group('year')}q{quarter}"
+    return text
 
 
 def _numeric_value(value: str) -> Decimal | None:
@@ -213,6 +240,34 @@ def _numeric_value(value: str) -> Decimal | None:
         return Decimal(match.group(0))
     except InvalidOperation:
         return None
+
+
+def _numeric_values_match(
+    claim: Decimal,
+    evidence: Decimal | None,
+    claim_text: str,
+    evidence_text: str,
+) -> bool:
+    """Allow ordinary display rounding without accepting a different value."""
+
+    if evidence is None:
+        return False
+    if claim == evidence:
+        return True
+
+    claim_places = _decimal_places(claim_text)
+    evidence_places = _decimal_places(evidence_text)
+    if claim_places >= evidence_places:
+        return False
+
+    quantizer = Decimal(1).scaleb(-claim_places)
+    rounded_evidence = evidence.quantize(quantizer, rounding=ROUND_HALF_UP)
+    return rounded_evidence == claim
+
+
+def _decimal_places(value: str) -> int:
+    match = re.search(r"[-+]?\d+(?:\.(\d+))?", value)
+    return len(match.group(1)) if match and match.group(1) else 0
 
 
 def _unit_of(value: str) -> str:

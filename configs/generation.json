@@ -1,0 +1,9 @@
+{
+  "deepseek": {
+    "enabled": false,
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash",
+    "timeout_seconds": 45,
+    "max_retries": 2
+  }
+}
