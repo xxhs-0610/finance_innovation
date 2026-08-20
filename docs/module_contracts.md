@@ -236,6 +236,17 @@
 
 模块4推荐调用 `retrieve(question)` 获取完整检索响应；该响应包含 `status`、`module4_guidance`、查询分析、证据和诊断信息。旧代码仍可通过 `retrieve_evidence(question)` 获取只包含 `evidence` 的兼容列表，但会丢失“需澄清/拒答/降级”状态，不应作为新交接链路的唯一接口。
 
+任务4/任务5需要跨进程调用时，也可以使用任务3提供的 HTTP 等价接口：
+
+```http
+POST /api/v1/retrieve
+Content-Type: application/json
+
+{"question":"2025年三季度商业银行资本充足率是多少？","top_k":5}
+```
+
+该接口响应必须与 `retrieve(question).to_dict()` 保持同一契约。它只负责检索，不代替任务4答案生成，也不代替任务5最终 `/api/v1/ask` 接口。
+
 ### 模块4必须处理的响应状态
 
 | `status` | 模块4动作 | 是否允许生成确定性答案 |

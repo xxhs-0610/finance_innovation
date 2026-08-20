@@ -257,7 +257,7 @@
               <div class="kb-filter-bar">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <input type="text" class="kb-search-input" id="kbSearchInput" placeholder="按文档名称、文号、分类搜索..." />
-                  <span class="badge badge-indigo">全量文档: 6</span>
+                  <span class="badge badge-indigo" id="kbTotalBadge">全量文档: 500 篇</span>
                 </div>
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-sm btn-primary" id="rebuildIndexBtn">
@@ -267,22 +267,34 @@
                 </div>
               </div>
 
-              <table class="kb-table">
-                <thead>
-                  <tr>
-                    <th>文档 ID</th>
-                    <th>文档标题 / 文号</th>
-                    <th>格式</th>
-                    <th>切片规模</th>
-                    <th>监管分类</th>
-                    <th>索引状态</th>
-                    <th>治理操作</th>
-                  </tr>
-                </thead>
-                <tbody id="kbTableBody">
-                  <!-- Dynamically populated by KBController -->
-                </tbody>
-              </table>
+              <div class="kb-table-scroll-wrapper">
+                <table class="kb-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 110px;">文档 ID</th>
+                      <th>文档标题 / 报表名称</th>
+                      <th style="width: 70px;">格式</th>
+                      <th style="width: 120px;">切片规模</th>
+                      <th style="width: 120px;">监管分类</th>
+                      <th style="width: 80px;">索引状态</th>
+                      <th style="width: 130px;">治理操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="kbTableBody">
+                    <!-- Dynamically populated by KBController -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination Footer -->
+              <div class="kb-pagination-bar" id="kbPaginationBar">
+                <div class="kb-pagination-info" id="kbPaginationInfo">共 500 篇文档，第 1 / 50 页</div>
+                <div class="kb-pagination-controls">
+                  <button class="btn btn-sm btn-ghost" id="kbPrevPageBtn">上一页</button>
+                  <div class="kb-page-numbers" id="kbPageNumbers"></div>
+                  <button class="btn btn-sm btn-ghost" id="kbNextPageBtn">下一页</button>
+                </div>
+              </div>
             </div>
           </section>
 

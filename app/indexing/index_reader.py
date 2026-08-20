@@ -12,6 +12,21 @@ from app.indexing.vector_index import VectorIndexSearcher
 from app.schemas.chunk_schema import SearchResult, SourceInfo
 
 
+def _resolve_default_db_path(requested: str | Path) -> Path:
+    p = Path(requested)
+    if p.exists():
+        return p
+    for candidate in [
+        Path("data/processed/kb_rebuild/metadata.db"),
+        Path("data/processed/kb_full_validation/metadata.db"),
+        Path("data/processed/metadata.db"),
+        Path("data/processed/kb/metadata.db"),
+    ]:
+        if candidate.exists():
+            return candidate
+    return p
+
+
 class KnowledgeBaseReader:
     def __init__(
         self,
@@ -22,7 +37,7 @@ class KnowledgeBaseReader:
         model_name: str | None = None,
         device: str | None = None,
     ) -> None:
-        self.db_path = Path(db_path)
+        self.db_path = _resolve_default_db_path(db_path)
         self.vector_index_dir = Path(vector_index_dir) if vector_index_dir else _infer_vector_index_dir(self.db_path)
         self.embedding_backend = embedding_backend
         self.model_name = model_name
