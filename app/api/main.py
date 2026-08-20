@@ -20,13 +20,29 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.generation.answer_generator import generate_answer
 from app.indexing.index_reader import _resolve_default_db_path
 from app.retrieval.hybrid_retriever import retrieve
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+
+
+class RetrievalRequest(BaseModel):
+    """Request accepted by the module-3 retrieval endpoint."""
+
+    question: str = Field(..., min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class RetrievalAPIResponse(BaseModel):
+    query: str
+    status: str
+    analysis: dict[str, Any]
+    evidence: list[dict[str, Any]]
+    diagnostics: dict[str, Any]
+    module4_guidance: dict[str, Any]
 
 
 def ask(question: str) -> dict:
@@ -86,6 +102,29 @@ def get_health():
         "version": "2.1.0",
         "pipeline": "Module 1-4 Connected",
     }
+
+
+@app.post(
+    "/api/v1/retrieve",
+    response_model=RetrievalAPIResponse,
+    tags=["retrieval"],
+    summary="Run module-3 retrieval",
+)
+def retrieve_endpoint(request: RetrievalRequest) -> dict[str, Any]:
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question must not be blank")
+    try:
+        response = retrieve(question, top_k=request.top_k)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "retrieval_unavailable",
+                "error_type": type(exc).__name__,
+            },
+        ) from exc
+    return response.to_dict()
 
 
 @app.post("/api/v1/ask")

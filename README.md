@@ -200,6 +200,21 @@ Windows 下 FAISS 与 Torch 可能分别加载不同 OpenMP 运行时，因此�
 - 同一期间存在多个表格数值列时返回统计口径澄清，不默认选列
 - 数值、单位、条款号和单元格引用保持源数据不变
 
+任务4/任务5联调时可通过模块3 HTTP 检索接口获取同一完整响应：
+
+```bat
+uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+```
+
+```http
+POST /api/v1/retrieve
+Content-Type: application/json
+
+{"question":"2025年三季度商业银行资本充足率是多少？","top_k":5}
+```
+
+该接口只返回任务3检索结果，不负责大模型答案生成；最终 `/api/v1/ask` 由任务5在接入任务4后负责。
+
 ### 5. 启动前端演示
 
 ```powershell
