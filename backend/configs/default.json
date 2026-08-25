@@ -1,0 +1,24 @@
+{
+  "paths": {
+    "parsed_docs": "data/parsed/docs/parsed_docs.jsonl",
+    "parsed_tables": "data/parsed/tables/table_evidence.jsonl",
+    "processed_dir": "data/processed/kb_rebuild",
+    "indexes_dir": "indexes/kb_rebuild",
+    "metadata_db": "data/processed/kb_rebuild/metadata.db",
+    "vector_index_dir": "indexes/kb_rebuild"
+  },
+  "retrieval": {
+    "default_top_k": 5,
+    "keyword_backend": "sqlite_fts5",
+    "vector_backend": "faiss",
+    "hybrid_fusion": "rrf",
+    "bm25_weight": 0.5,
+    "vector_weight": 0.5
+  },
+  "vector_index": {
+    "embedding_backend": "sentence-transformers",
+    "model_name": "BAAI/bge-small-zh-v1.5",
+    "normalize_embeddings": true,
+    "metric": "inner_product_cosine"
+  }
+}

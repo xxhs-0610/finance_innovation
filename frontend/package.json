@@ -1,0 +1,23 @@
+{
+  "name": "regtrust-rag-frontend",
+  "version": "2.1.0",
+  "description": "银行业监管制度与统计报表可信 RAG 问答系统 - 前端工程",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx -y serve . -l 8080",
+    "start": "npx -y serve . -l 8080",
+    "serve": "python -m http.server 8080"
+  },
+  "keywords": [
+    "rag",
+    "banking",
+    "regulation",
+    "financial",
+    "frontend"
+  ],
+  "author": "Finance Innovation RAG Team",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}
