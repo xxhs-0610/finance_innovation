@@ -27,6 +27,15 @@ YEAR_RANGE_RE = re.compile(
     r"(?P<end>(?:19|20)\d{2})\s*年?"
 )
 YEAR_RE = re.compile(r"(?:19|20)\d{2}")
+ORGANIZATION_RE = re.compile(
+    r"[\u4e00-\u9fffA-Za-z0-9·]{2,40}?"
+    r"(?:大学|学院|学校|银行|保险公司|保险集团|证券公司|基金公司|信托公司|"
+    r"金融控股公司|监管局|管理局|委员会|监督管理总局)"
+)
+GENERIC_ORGANIZATIONS = {
+    "银行", "商业银行", "城市商业银行", "农村商业银行", "政策性银行",
+    "保险公司", "证券公司", "基金公司", "金融机构",
+}
 VALUE_RE = re.compile(r"(?<!\d)\d+(?:\.\d+)?\s*(?:[%％]|亿元|万元|元|个|家)")
 PUNCTUATION_RE = re.compile(r"[，。！？?；;：:、“”‘’（）()【】\[\]<>《》]+")
 
@@ -122,6 +131,10 @@ def parse_query(question: str) -> QueryAnalysis:
     if institution:
         entities["institution"] = institution
 
+    subject_entity = _extract_subject_entity(normalized)
+    if subject_entity:
+        entities["subject_entity"] = subject_entity
+
     bank_tier = _extract_bank_tier(normalized)
     if bank_tier:
         entities["bank_tier"] = bank_tier
@@ -193,6 +206,7 @@ def _build_keywords(question: str, entities: dict[str, str]) -> list[str]:
         "document_number",
         "issuer",
         "institution",
+        "subject_entity",
         "bank_tier",
         "metric",
         "clause_no",
@@ -214,6 +228,27 @@ def _build_keywords(question: str, entities: dict[str, str]) -> list[str]:
     if not keywords and question:
         keywords.append(question)
     return keywords
+
+
+def _extract_subject_entity(text: str) -> str:
+    cleaned = re.sub(r"^(?:请问|请说明|想问|查询|帮我查一下)", "", text.strip())
+    for match in ORGANIZATION_RE.finditer(cleaned):
+        value = _strip_subject_context(match.group(0).strip())
+        if any(marker in value for marker in ("哪个", "哪些", "哪所", "什么", "谁")):
+            continue
+        if value not in GENERIC_ORGANIZATIONS:
+            return value
+    return ""
+
+
+def _strip_subject_context(value: str) -> str:
+    value = re.sub(
+        r"^(?:(?:19|20)\d{2}年(?:第?[一二三四1234]季度|\d{1,2}月|上半年|下半年|年末|年度)?|"
+        r"第?[一二三123]档)",
+        "",
+        value,
+    )
+    return value.strip()
 
 
 def _extract_operator(text: str) -> str:

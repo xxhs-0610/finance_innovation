@@ -14,6 +14,7 @@ from app.retrieval.table_retriever import TableRetriever
 from app.retrieval.vector_retriever import KnowledgeBaseVectorBackend, VectorRetriever
 from app.schemas.chunk_schema import SearchResult
 from app.schemas.retrieval_schema import QueryAnalysis, RetrievalResponse
+from app.utils.paths import resolve_path
 
 
 class CandidateRetriever(Protocol):
@@ -145,6 +146,10 @@ class HybridRetriever:
         # boundary. This also protects callers that inject a custom retriever
         # which does not apply module 3's built-in post-filters.
         fused = apply_entity_filters(analysis, fused)
+        entity_filter_diagnostics = {
+            "subject_entity": analysis.entities.get("subject_entity", ""),
+            "candidate_count_after_filter": len(fused),
+        }
         reranker_diagnostics: dict[str, str] = {"status": "disabled"}
         if self.reranker:
             try:
@@ -171,6 +176,9 @@ class HybridRetriever:
                     "name": self.reranker.name,
                 }
         evidence = select_evidence(fused, top_k=top_k, analysis=analysis)
+        evidence, evidence_rejection = _enforce_subject_evidence_consistency(
+            analysis, evidence
+        )
         status = _response_status(analysis, evidence, failures)
         return RetrievalResponse(
             query=analysis.question,
@@ -184,6 +192,8 @@ class HybridRetriever:
                 },
                 "retrievers": retriever_diagnostics,
                 "reranker": reranker_diagnostics,
+                "entity_consistency": entity_filter_diagnostics,
+                "evidence_rejection": evidence_rejection,
                 "failures": failures,
             },
             module4_guidance=_module4_guidance(analysis, status, evidence),
@@ -259,7 +269,13 @@ def retrieve(
     db_path: str | Path = "data/processed/kb_rebuild/metadata.db",
     index_dir: str | Path = "indexes/kb_rebuild",
 ) -> RetrievalResponse:
-    reader = KnowledgeBaseReader(db_path, vector_index_dir=index_dir)
+    # Resolve repository-relative assets before constructing module 2's reader.
+    # The API is commonly started from ``backend/`` while data and indexes live
+    # at the project root; passing the raw relative paths would silently make
+    # FAISS look under ``backend/indexes`` and degrade otherwise valid answers.
+    resolved_db_path = resolve_path(db_path)
+    resolved_index_dir = resolve_path(index_dir)
+    reader = KnowledgeBaseReader(resolved_db_path, vector_index_dir=resolved_index_dir)
     retriever = HybridRetriever(
         [
             BM25Retriever(reader),
@@ -311,6 +327,46 @@ def _response_status(
     return "answerable"
 
 
+def _enforce_subject_evidence_consistency(
+    analysis: QueryAnalysis,
+    evidence: Sequence[SearchResult],
+) -> tuple[list[SearchResult], dict[str, object]]:
+    """Reject lexical near-misses for explicit organization subjects."""
+
+    subject = analysis.entities.get("subject_entity", "")
+    if not subject:
+        return list(evidence), {"status": "not_applicable"}
+    expected = _normalize_entity_text(subject)
+    accepted: list[SearchResult] = []
+    rejected: list[str] = []
+    for item in evidence:
+        scope = _normalize_entity_text(
+            " ".join(
+                [
+                    item.source.title,
+                    item.source.issuer,
+                    *item.source.section_path,
+                    item.text,
+                    str(item.metadata.get("institution") or ""),
+                    str(item.metadata.get("organization") or ""),
+                ]
+            )
+        )
+        if expected and expected in scope:
+            accepted.append(item)
+        else:
+            rejected.append(item.chunk_id)
+    return accepted, {
+        "status": "passed" if not rejected else "rejected",
+        "subject_entity": subject,
+        "rejected_chunk_ids": rejected,
+    }
+
+
+def _normalize_entity_text(value: str) -> str:
+    return "".join(str(value or "").lower().split())
+
+
 def _module4_guidance(
     analysis: QueryAnalysis,
     status: str,
@@ -345,7 +401,11 @@ def _module4_guidance(
         return {
             "action": "refuse",
             "may_generate_answer": False,
-            "reason": "no_reliable_evidence",
+            "reason": (
+                "out_of_domain"
+                if analysis.query_type == "unsupported"
+                else "no_reliable_evidence"
+            ),
         }
     return {
         "action": "answer" if status == "answerable" else "answer_with_warning",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from app.indexing.index_reader import KnowledgeBaseReader
@@ -10,6 +11,7 @@ from app.retrieval.metadata_filter import (
 )
 from app.schemas.chunk_schema import ChunkType, SearchResult
 from app.schemas.retrieval_schema import QueryAnalysis
+from app.utils.paths import resolve_path
 
 
 class VectorSearchBackend(Protocol):
@@ -54,6 +56,16 @@ class KnowledgeBaseVectorBackend:
 
     def __init__(self, reader: KnowledgeBaseReader | None = None) -> None:
         self.reader = reader or KnowledgeBaseReader()
+        # Module 2's vector metadata may contain the repository-relative model
+        # path ``Model/...``. Resolve it at the module-3 adapter boundary so
+        # starting the API from ``backend/`` does not silently disable FAISS.
+        if not getattr(self.reader, "model_name", None):
+            model_path = resolve_path(Path("Model") / "bge-small-zh-v1.5")
+            if model_path.exists():
+                try:
+                    self.reader.model_name = str(model_path)
+                except AttributeError:
+                    pass
 
     def search(
         self,
