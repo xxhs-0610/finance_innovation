@@ -29,3 +29,4 @@ frontend/node_modules/
 # Environment variables (contains real API keys — never commit)
 .env
 >>>>>>> bf680b9d6881c682d5c0b0a3dc42cfa36a310898
+indexes/
