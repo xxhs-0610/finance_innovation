@@ -25,6 +25,7 @@ def apply_entity_filters(
     end_year = _to_year(analysis.entities.get("end_year"))
     exact_period = requested_period(analysis) if analysis.query_type == "table_lookup" else ""
     bank_tier = analysis.entities.get("bank_tier", "")
+    subject_entity = analysis.entities.get("subject_entity", "")
     strict_metric = analysis.entities.get("metric", "") if analysis.query_type in {
         "table_lookup",
         "clause_threshold",
@@ -35,6 +36,7 @@ def apply_entity_filters(
         and end_year is None
         and not exact_period
         and not bank_tier
+        and not subject_entity
         and not strict_metric
     ):
         return candidates
@@ -89,6 +91,12 @@ def apply_entity_filters(
             checked_fields["bank_tier"] = bank_tier
             if candidate_tiers:
                 checked_fields["candidate_bank_tiers"] = ",".join(candidate_tiers)
+
+        if subject_entity:
+            expected_subject = _normalize_text(subject_entity)
+            if not expected_subject or expected_subject not in _candidate_scope_text(candidate):
+                continue
+            checked_fields["subject_entity"] = subject_entity
 
         if strict_metric:
             if not _candidate_matches_metric(candidate, strict_metric):
@@ -177,6 +185,20 @@ def _candidate_matches_metric(candidate: SearchResult, metric: str) -> bool:
         [candidate.source.title, *candidate.source.section_path, candidate.text]
     )
     return bool(expected and expected in _normalize_text(scope_text))
+
+
+def _candidate_scope_text(candidate: SearchResult) -> str:
+    metadata = candidate.metadata
+    fields = [
+        candidate.source.title,
+        candidate.source.issuer,
+        *candidate.source.section_path,
+        candidate.text,
+        str(metadata.get("institution") or ""),
+        str(metadata.get("organization") or ""),
+        str(metadata.get("bank_name") or ""),
+    ]
+    return _normalize_text(" ".join(fields))
 
 
 def _normalize_text(value: str) -> str:

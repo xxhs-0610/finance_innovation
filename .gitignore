@@ -17,6 +17,15 @@ Model/bge-small-zh-v1.5/model.safetensors
 Model/bge-small-zh-v1.5/pytorch_model.bin
 Model/bge-small-zh-v1.5/.cache/
 
+<<<<<<< HEAD
 logs/
 *.log
 
+=======
+# Local secrets and installed frontend dependencies
+frontend/node_modules/
+**/node_modules/
+
+# Environment variables (contains real API keys — never commit)
+.env
+>>>>>>> bf680b9d6881c682d5c0b0a3dc42cfa36a310898

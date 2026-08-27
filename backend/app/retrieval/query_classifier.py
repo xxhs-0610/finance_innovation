@@ -73,6 +73,64 @@ DOMAIN_MARKERS = (
 OUT_OF_SCOPE_MARKERS = (
     "天气", "菜谱", "旅游攻略", "电影推荐", "游戏攻略", "写一首诗", "写代码",
 )
+# Explicit non-regulatory subjects should never be sent to the knowledge base.
+# Lexical overlap such as two organizations both containing "finance" or
+# "university" is not evidence that the question belongs to this corpus.
+NON_REGULATORY_SUBJECT_MARKERS = (
+    "大学",
+    "学院",
+    "学校",
+    "校长",
+    "院长",
+    "教授",
+    "老师",
+    "天气",
+    "旅游",
+    "景点",
+    "电影",
+    "电视剧",
+    "游戏",
+    "菜谱",
+    "食谱",
+    "写诗",
+    "写代码",
+)
+FINANCE_SCOPE_MARKERS = (
+    "银行",
+    "金融",
+    "监管",
+    "资本",
+    "贷款",
+    "保险",
+    "证券",
+    "基金",
+    "信贷",
+    "报表",
+    "指标",
+    "风险",
+    "合规",
+    "条款",
+    "办法",
+    "规定",
+    "通知",
+    "机构",
+    "文号",
+    "统计",
+    "利率",
+    "资产",
+    "负债",
+    "流动性",
+    "拨备",
+)
+REGULATORY_CONTEXT_MARKERS = (
+    "监管", "报表", "指标", "资本充足率", "贷款", "保险监管", "规定", "办法",
+    "条款", "统计", "合规", "风险", "拨备", "流动性", "制度", "政策",
+    "任职资格", "任职条件", "行政许可", "核准", "审批", "信息披露",
+)
+OPEN_DOMAIN_FACT_MARKERS = (
+    "校长", "院长", "董事长", "行长是谁", "总经理", "创始人", "地址", "电话", "官网",
+    "客服电话", "营业时间", "几点下班", "下班时间", "几点营业", "网点", "招聘", "校招", "工资", "薪资", "股价", "股票代码",
+)
 STATISTICAL_METRIC_MARKERS = (
     "核心一级资本充足率",
     "一级资本充足率",
@@ -98,9 +156,14 @@ def classify_query(question: str) -> QueryType:
     text = SPACE_RE.sub("", question or "").strip("，。！？?；;：:")
     if len(text) < 3 or text in AMBIGUOUS_QUESTIONS:
         return "ambiguous"
-    if any(marker in text for marker in OUT_OF_SCOPE_MARKERS) and not any(
-        marker in text for marker in DOMAIN_MARKERS
-    ):
+    if any(marker in text for marker in OUT_OF_SCOPE_MARKERS):
+        return "unsupported"
+    has_regulatory_context = any(
+        marker in text for marker in REGULATORY_CONTEXT_MARKERS
+    )
+    if any(marker in text for marker in NON_REGULATORY_SUBJECT_MARKERS) and not has_regulatory_context:
+        return "unsupported"
+    if any(marker in text for marker in OPEN_DOMAIN_FACT_MARKERS) and not has_regulatory_context:
         return "unsupported"
     if any(marker in text for marker in CROSS_DOCUMENT_MARKERS):
         return "cross_document"
@@ -120,4 +183,6 @@ def classify_query(question: str) -> QueryType:
         marker in text for marker in ("是多少", "多少", "数值", "情况")
     ):
         return "table_lookup"
+    if not any(marker in text for marker in FINANCE_SCOPE_MARKERS):
+        return "unsupported"
     return "regulation_fact"
