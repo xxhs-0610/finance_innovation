@@ -6,13 +6,18 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+for path_str in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 from app.indexing.build_kb import build_kb
 
 
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "default.json"
+DEFAULT_CONFIG_PATH = (
+    PROJECT_ROOT / "backend" / "configs" / "default.json"
+    if (PROJECT_ROOT / "backend" / "configs" / "default.json").exists()
+    else PROJECT_ROOT / "configs" / "default.json"
+)
 
 
 def parse_args() -> argparse.Namespace:

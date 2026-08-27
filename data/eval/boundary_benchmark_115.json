@@ -1,0 +1,957 @@
+[
+  {
+    "id": "A01",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行资本充足率最低要求是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A02",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "第三档商业银行资本充足率最低要求是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A03",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "《商业银行资本管理办法》中关于第一档商业银行的划分标准是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A04",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行主要监管指标情况表中，2024年四季度不良贷款率是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT"
+  },
+  {
+    "id": "A05",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行对非同业单一客户的贷款余额不得超过资本净额的多少比例？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A06",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行流动性覆盖率（LCR）的最低监管标准是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A07",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行拨备覆盖率的监管下限要求是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A08",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "《商业银行资本管理办法》附件23主要规范什么内容？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A09",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "农村商业银行申请开办外汇业务的行政许可程序是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "BUSINESS_PROCESS"
+  },
+  {
+    "id": "A10",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "金融租赁公司主要出资人的资产总额监管要求是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A11",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "消费金融公司主要出资人持股比例不得低于多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A12",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行杠杆率监管底线标准是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A13",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行恢复计划的主要内容应包含哪些治理架构机制？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "BUSINESS_PROCESS"
+  },
+  {
+    "id": "A14",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "监管统计报表中“各项贷款”包括哪些具体的统计口径？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "INDICATOR_DEFINITION"
+  },
+  {
+    "id": "A15",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "《商业银行资本管理办法》附件2中，对居住用房地产风险暴露的风险权重如何规定？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A16",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行向监管机构报送资本充足率信息披露报告的频率和时间要求是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "BUSINESS_PROCESS"
+  },
+  {
+    "id": "A17",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行大额风险暴露管理办法中对单一集团客户的授信余额上限是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE"
+  },
+  {
+    "id": "A18",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "银行保险机构数据安全事件分为几级？各级的报告时限要求是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "BUSINESS_PROCESS"
+  },
+  {
+    "id": "A19",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行内部评级法实施前需要满足哪些前置合规验收条件？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A20",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行特定养老储蓄业务试点方案的合规要求有哪些？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A21",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "2023年各季度全国银行业金融机构总资产和总负债情况是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT"
+  },
+  {
+    "id": "A22",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行资本管理办法中合格核心一级资本工具必须具备哪些特征？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT"
+  },
+  {
+    "id": "A23",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "政策性银行与商业银行在监管统计口径上有哪些主要差异？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "INDICATOR_DEFINITION"
+  },
+  {
+    "id": "A24",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "商业银行逾期90天以上贷款纳入不良贷款的统计口径是怎样规定的？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "INDICATOR_DEFINITION"
+  },
+  {
+    "id": "A25",
+    "category": "A_DOMAIN_QA",
+    "category_name": "A类：明显领域内",
+    "question": "某商业银行资本净额10亿元，拟向单一客户发放贷款8000万元，是否合规？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "COMPLIANCE_JUDGMENT"
+  },
+
+  {
+    "id": "B01",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "南京今天天气怎么样？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B02",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "北京明天会不会下雨？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B03",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "推荐一部好看的悬疑科幻电影。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B04",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "请帮我写一段Python快速排序算法代码。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B05",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "红烧肉的最正宗家常做法是什么？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B06",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "地球到月球的平均距离是多少公里？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B07",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "2026年世界杯足球赛在哪个国家举办？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B08",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "治疗普通感冒发烧一般吃什么药见效最快？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B09",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "如何用Vue3实现一个响应式计数器组件？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B10",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "中国历史上一共有多少个皇帝？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B11",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "推荐几本关于西方古典哲学的入门书籍。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B12",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "如何在Windows系统上配置Docker开发环境？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B13",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "简单介绍一下爱因斯坦相对论的基本原理。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B14",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "杭州西湖旅游有哪些必去的打卡景点？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B15",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "怎样科学有效地减脂减肥并且不反弹？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B16",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "请帮我写一首关于秋天落叶的现代抒情诗歌。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B17",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "为什么猫咪非常喜欢呆在狭窄的纸箱子里？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B18",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "太阳系中体积最大的行星是哪一颗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B19",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "如何冲泡出一杯香气浓郁的云南普洱茶？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "B20",
+    "category": "B_OUT_OF_SCOPE_OBVIOUS",
+    "category_name": "B类：明显领域外",
+    "question": "家用汽车的发动机机油通常跑多少公里需要更换？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+
+  {
+    "id": "C01",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "工商银行股票明天会上涨吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C02",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "招商银行股票现在适合买入建仓吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C03",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "建设银行的股价近期技术走势应该如何分析？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C04",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "推荐几只收益稳定、风险低的商业银行理财产品。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C05",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "去哪家银行存大额存单存款利息最高？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C06",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "现在买招商中证银行ETF基金能赚钱吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C07",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "招商银行目前在招聘前端开发工程师吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C08",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "工商银行软件开发中心的应届生校招薪资待遇怎么样？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C09",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "去商业银行做综合柜员需要什么样的学历背景？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C10",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "银行校招求职笔试考行测还是综合金融专业知识？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C11",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "中国银行客户经理一个月的平均工资收入是多少？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C12",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "个人去工商银行网点办理借记卡开户需要带什么证件？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C13",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "银行营业网点一般周末几点下班关门？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C14",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "在银行ATM机取款被吞卡了应该怎么联系工作人员取回？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C15",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "手机银行App里的单日转账限额怎么在线上修改提高？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C16",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "个人申请银行汽车按揭贷款需要抵押机动车登记证书吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C17",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "银行房贷断供连续几个月房子会被法院强制法拍？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C18",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "信用卡逾期还款三天会立即被报送央行个人征信黑名单吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C19",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "比特币在加密货币交易所的价格今年会突破十万美元吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C20",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "推荐几只近期可能大幅上涨的黄金概念股票代码。",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C21",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "美元兑离岸人民币外汇汇率下周会升值还是贬值？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C22",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "美联储下个月议息会议会宣布降息25个基点吗？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C23",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "去银行柜台兑换美元现钞需要提前几天在手机上预约？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C24",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "在银行存入50万元如果银行破产倒闭了存款保险能赔多少？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+  {
+    "id": "C25",
+    "category": "C_OUT_OF_SCOPE_BANK_ADJACENT",
+    "category_name": "C类：银行金融相关但实际领域外",
+    "question": "支付宝零钱和微信零钱提现到银行卡哪个手续费更低？",
+    "expected_intent": "OUT_OF_SCOPE",
+    "expected_qa_type": null
+  },
+
+  {
+    "id": "D01",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你能做什么？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D02",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "这个系统解决什么问题？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D03",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你支持哪些问题查询？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D04",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你的数据来源是什么？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D05",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "为什么刚才不回答天气问题？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D06",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你的回答可信吗？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D07",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "这个系统如何保证回答的可信度？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D08",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你有哪些使用限制？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D09",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你是什么系统？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D10",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "介绍一下你自己的定位和核心功能。",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D11",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你的知识库数据来自于哪些监管机构和文件？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D12",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "为什么股票预测问题会被你的系统拒绝回答？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D13",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你是如何防止大模型在监管问答中产生幻觉的？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D14",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "系统支持跨监管文件和报表正文联合查询吗？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+  {
+    "id": "D15",
+    "category": "D_SYSTEM_META",
+    "category_name": "D类：系统自身问题",
+    "question": "你能做哪些业务场景的合规辅助判断？",
+    "expected_intent": "SYSTEM_META",
+    "expected_qa_type": null
+  },
+
+  {
+    "id": "E01",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这个比例是多少？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E02",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "指标是多少？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E03",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这样做合规吗？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E04",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "某银行这样做行不行？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E05",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这个达到监管标准了吗？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E06",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "按照规定需要保存几年？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E07",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "办理这个业务需要几天时间？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E08",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "满足这个要求需要多少资本？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E09",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这项监管惩罚措施是什么？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E10",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这家机构的拨备覆盖率达标了吗？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E11",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "某机构这项指标超标了吗？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E12",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "那个报表什么时候发布？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E13",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "申请这个许可证要满足什么条件？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E14",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "这个指标的计算公式是什么？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+  {
+    "id": "E15",
+    "category": "E_NEED_CLARIFICATION",
+    "category_name": "E类：信息不足",
+    "question": "企业贷款逾期了是否算违约？",
+    "expected_intent": "NEED_CLARIFICATION",
+    "expected_qa_type": null
+  },
+
+  {
+    "id": "F01",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2035年国家金融监督管理总局银行业监管统计信息发布日程表是怎样的？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F02",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "《商业银行资本管理办法》附件99关于量子计算资产的计量规定是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F03",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "银行业监管统计资料保存几年？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "MISSING_NUMERIC_EVIDENCE"
+  },
+  {
+    "id": "F04",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2024年和2025年火星开发金融租赁公司的总资产分别是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F05",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "《消费金融公司管理办法》第九百九十九条规定了什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F06",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2024年二季度某特定未公开内部村镇银行的核心一级资本充足率具体数值是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F07",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2011年某省份保险公司原保险保费收入月度明细是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F08",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "银行业金融机构绿色信贷评价指标中生物多样性贷款的具体折算系数是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "INDICATOR_DEFINITION",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F09",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2026年12月全国各地区原保险保费收入情况表数值是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F10",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "《商业银行大额风险暴露管理办法》第七十二条第二款的具体文字表述是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F11",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "商业银行特定信托收益权投资在2026年季度的准确全口径统计总额是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F12",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "农村商业银行开办数字人民币跨境结算业务的专项资本计提折算率是多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "THRESHOLD_RULE",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F13",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "2025年四季度金融租赁公司航空器租赁资产全行业坏账率具体为多少？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "STATISTICAL_REPORT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F14",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "《商业银行资本管理办法》附件30所列的特殊豁免清单内容是什么？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "REGULATION_FACT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  },
+  {
+    "id": "F15",
+    "category": "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE",
+    "category_name": "F类：领域内但知识库证据不足",
+    "question": "某银行董事李某办理一笔特定抵质押信贷业务是否经总行审批合规？",
+    "expected_intent": "DOMAIN_QA",
+    "expected_qa_type": "COMPLIANCE_JUDGMENT",
+    "expected_verifier_answerable": false,
+    "expected_reason_code": "NO_RELEVANT_EVIDENCE"
+  }
+]

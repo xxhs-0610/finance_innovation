@@ -45,11 +45,19 @@ from app.controllers.import_controller import router as import_router, ParseRequ
 # Services
 from app.services.rag_service import rag_service
 
-# Utils & Exceptions
+# Utils, Exceptions & Logging
 from app.utils.exceptions import BusinessException, business_exception_handler
+from app.utils.logger import get_logger, setup_logging
 from configs.settings import settings
+import time
+import uuid
+from starlette.requests import Request
 
-FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+logger = get_logger("app.api")
+
+FRONTEND_DIR = settings.paths.frontend_dir
+if not FRONTEND_DIR.exists():
+    FRONTEND_DIR = Path(__file__).resolve().parents[3] / "frontend"
 
 
 def ask(question: str) -> dict:
@@ -80,6 +88,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    req_id = uuid.uuid4().hex[:8]
+    method = request.method
+    path = request.url.path
+    client_ip = request.client.host if request.client else "unknown"
+    start_time = time.perf_counter()
+
+    is_static = path.startswith("/src") or path.startswith("/css") or path.startswith("/js") or path.endswith(".ico")
+    if not is_static:
+        logger.info(f"👉 [REQ-{req_id}] {method} {path} | Client: {client_ip}")
+
+    try:
+        response = await call_next(request)
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        if not is_static:
+            status_code = response.status_code
+            log_fn = logger.info if status_code < 400 else (logger.warning if status_code < 500 else logger.error)
+            log_fn(f"👈 [REQ-{req_id}] {method} {path} | Status: {status_code} | Latency: {latency_ms:.2f}ms")
+        return response
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.error(
+            f"❌ [REQ-{req_id}] {method} {path} | Exception: {type(exc).__name__}: {exc} | Latency: {latency_ms:.2f}ms",
+            exc_info=True,
+        )
+        raise
+
+
 # Register Routers
 app.include_router(health_router)
 app.include_router(kb_router)
@@ -107,6 +145,15 @@ def retrieve_endpoint(request: RetrievalRequest) -> dict[str, Any]:
             },
         ) from exc
     return response.to_dict() if hasattr(response, "to_dict") else response
+
+
+def ask(question: str, top_k: int = 5) -> dict[str, Any]:
+    return rag_service.ask(
+        question,
+        top_k=top_k,
+        retriever_fn=retrieve,
+        deepseek_enabled_fn=deepseek_enabled,
+    )
 
 
 @app.post("/api/v1/ask", tags=["rag"], summary="Run End-to-End RAG Q&A")

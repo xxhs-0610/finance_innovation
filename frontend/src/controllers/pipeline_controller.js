@@ -27,7 +27,7 @@ class PipelineController {
         title: '步骤 1：多格式文件统一导入 (File Ingestion)',
         desc: '负责将 Word (.docx)、PDF、Excel (.xlsx) 原始附件与 QA 评测集统一归档至标准目录。',
         input: 'data/raw/nfra_page_attachments_500/ + data/raw/qa/',
-        output: '本地统一 Raw 文件池与文件清单 Manifest'
+        output: '本地统一 Raw 文件池 (500 篇) 与文件清单 Manifest'
       },
       '2': {
         title: '步骤 2：文档与表格结构化解析 (Document & Table Parsing)',
@@ -36,22 +36,22 @@ class PipelineController {
         output: 'parsed_docs.jsonl, table_evidence.jsonl, doc_meta.jsonl'
       },
       '3': {
-        title: '步骤 3：知识库切片与双路索引 (KB Chunking & Indexing)',
-        desc: '生成带有完整层级路径元数据的条款/表格 Chunks，并构建 BM25 倒排索引与 FAISS 向量索引。',
-        input: 'data/parsed/ 下的结构化数据',
-        output: 'clause_chunks.jsonl, table_chunks.jsonl, faiss_index, bm25_index'
+        title: '步骤 3：知识库切片与双路索引构建 (KB Chunking & Indexing)',
+        desc: '生成带有完整层级路径元数据的条款/表格 Chunks (全量 125,166 切片)，并构建 BM25 倒排检索文本语料库与 FAISS 密集向量索引 (512维 BGE 嵌入)。',
+        input: 'data/processed/kb_rebuild/metadata.db (SQLite FTS5) + 切片语料',
+        output: 'indexes/kb_rebuild/ (faiss.index, embeddings.npy, chunk_id_map.json, vector_meta.json, bm25_corpus.jsonl)'
       },
       '4': {
         title: '步骤 4：意图路由、混合检索与可信生成 (Retrieval & Generation)',
-        desc: '执行查询意图五分类，触发 BM25+FAISS 混合召回与 BGE-Rerank 重排，大模型依据约束提示词生成，执行数字与幻觉校验。',
-        input: '用户查询 Query + 索引库',
+        desc: '执行查询意图五分类，触发 BM25+FAISS 混合召回与 BGE-Reranker/RRF 重排，大模型依据约束提示词生成，执行数字与幻觉校验。',
+        input: '用户查询 Query + indexes/kb_rebuild/ 索引库',
         output: '结构化答案 JSON + 证据包 + 风险提示 + 拒答判断'
       },
       '5': {
         title: '步骤 5：产品化前端展示与离线评测 (UI & Evaluation)',
         desc: '多会话交互问答、单列证据溯源、原文高亮联动、42条种子问答自动回归评测。',
         input: '后端 API / 检索与生成结果',
-        output: '高保真产品界面与评测报告'
+        output: '高保真产品界面与全量评测报告'
       }
     };
 

@@ -4,8 +4,10 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from copy import deepcopy
 from decimal import Decimal, InvalidOperation
+import re
 from typing import Any
 
+from app.generation.evidence_verifier import evidence_verifier
 from app.generation.refusal import assess_evidence_sufficiency, build_refusal
 from app.generation.verifier import verify_answer
 from app.schemas.answer_schema import (
@@ -13,7 +15,9 @@ from app.schemas.answer_schema import (
     normalize_evidence,
     normalize_retrieval_response,
 )
+from app.utils.logger import get_logger
 
+logger = get_logger("app.generation.answer")
 
 Generator = Callable[[str, list[dict[str, Any]]], str]
 
@@ -36,11 +40,13 @@ def generate_answer(
     retrieval_status = ""
     retrieval_guidance: dict[str, Any] = {}
     retrieval_diagnostics: dict[str, Any] = {}
+    query_analysis = None
     if retrieval is not None:
         normalized = retrieval["evidence"]
         retrieval_status = str(retrieval.get("status") or "")
         retrieval_guidance = retrieval["module4_guidance"]
         retrieval_diagnostics = retrieval["diagnostics"]
+        query_analysis = retrieval.get("analysis")
         gated = _handle_retrieval_gate(
             question,
             normalized,
@@ -49,19 +55,248 @@ def generate_answer(
             retrieval_diagnostics,
         )
         if gated is not None:
+            logger.info(
+                f"[AnswerGenerator] 检索门禁触发: retrieval_status='{retrieval_status}', action='{retrieval_guidance.get('action')}'"
+            )
             return gated
     else:
         normalized = normalize_evidence(evidence)
 
     normalized = _add_deterministic_table_derivations(normalized, question)
+
+    # =========================================================================
+    # Step 0.5: Deterministic Table Execution Engine (TABLE_LOOKUP / COMPARE / CALCULATION)
+    # =========================================================================
+    from app.schemas.task_plan_schema import TaskPlan
+
+    task_plan = None
+    task_type = ""
+    if query_analysis:
+        if isinstance(query_analysis, dict):
+            raw_tp = query_analysis.get("task_plan")
+            task_type = query_analysis.get("task_type") or (raw_tp.get("task_type") if isinstance(raw_tp, dict) else getattr(raw_tp, "task_type", ""))
+            if isinstance(raw_tp, dict):
+                task_plan = TaskPlan.from_dict(raw_tp)
+            elif isinstance(raw_tp, TaskPlan):
+                task_plan = raw_tp
+        else:
+            task_plan = getattr(query_analysis, "task_plan", None)
+            task_type = getattr(query_analysis, "task_type", None) or (task_plan.task_type if task_plan else "")
+
+    if not task_plan and "multi_target" in retrieval_diagnostics:
+        raw_mt = retrieval_diagnostics["multi_target"]
+        if isinstance(raw_mt, dict) and "task_plan" in raw_mt:
+            raw_tp = raw_mt["task_plan"]
+            if isinstance(raw_tp, dict):
+                task_plan = TaskPlan.from_dict(raw_tp)
+                task_type = task_plan.task_type
+            elif isinstance(raw_tp, TaskPlan):
+                task_plan = raw_tp
+                task_type = task_plan.task_type
+
+    if task_plan and task_type in {"TABLE_LOOKUP", "TABLE_COMPARE", "TABLE_CALCULATION"}:
+        try:
+            from app.retrieval.table_executor import table_executor
+            mt_data = retrieval_diagnostics.get("multi_target") or normalized
+            exec_result = table_executor.execute(task_plan, mt_data)
+            logger.info(
+                f"[AnswerGenerator] 表格确定性执行完成 | task_type={task_type} | status={exec_result.status} | matched_opt={exec_result.matched_option}"
+            )
+
+            if exec_result.status == "SUCCESS":
+                from app.generation.answer_composer import answer_composer
+                if task_type == "TABLE_COMPARE":
+                    ans_text = answer_composer.compose_table_compare_answer(exec_result, task_plan, normalized)
+                elif task_type == "TABLE_CALCULATION":
+                    ans_text = answer_composer.compose_table_calculation_answer(exec_result, task_plan, normalized)
+                else:
+                    ans_text = answer_composer.compose_table_lookup_answer(exec_result, task_plan, normalized)
+
+                citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
+                result = AnswerResult(
+                    status="answered",
+                    answer=ans_text,
+                    evidence=normalized,
+                    risk_tips=["本结果由程序确定性执行计算与比较完成，数据源于官方监管报表。"],
+                    confidence=0.99,
+                    citations=citations,
+                    verification={
+                        "passed": True,
+                        "issues": [],
+                        "numeric_claims": [f"{op.name}={op.value}" for op in exec_result.operands],
+                        "table_execution": exec_result.to_dict(),
+                        "intermediate_verification": exec_result.intermediate_verification,
+                    },
+                    question=str(question or "").strip(),
+                ).to_dict()
+                return _attach_retrieval_context(
+                    result,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+
+            elif exec_result.status in {"MISSING_OPERAND", "CALCULATION_ERROR"}:
+                err_code = "MISSING_OPERAND" if exec_result.status == "MISSING_OPERAND" else "CALCULATION_FAILED"
+                logger.warning(f"[AnswerGenerator] 表格执行失败 [{err_code}]: {exec_result.explanation}")
+                refusal = {
+                    "status": "no_evidence",
+                    "answer": f"⚠️ 系统已定位查询目标，但在知识库对应表格中未能完成运算（{exec_result.explanation}），无法完成确定性计算或比较。",
+                    "evidence": normalized,
+                    "risk_tips": ["知识库表格中未包含指定行列或指标数值"],
+                    "confidence": 0.0,
+                    "citations": [],
+                    "error_code": err_code,
+                    "verification": {
+                        "passed": False,
+                        "error_code": err_code,
+                        "issues": [err_code],
+                        "table_execution": exec_result.to_dict(),
+                        "intermediate_verification": exec_result.intermediate_verification,
+                    },
+                    "refusal_reason": err_code,
+                    "question": str(question or "").strip(),
+                }
+                return _attach_retrieval_context(
+                    refusal,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+        except Exception as e:
+            logger.error(f"[AnswerGenerator] 表格确定性执行器异常: {e}", exc_info=True)
+
+    # =========================================================================
+    # Step 0.6: Discrete Option Verification Engine (FACT_SINGLE_CHOICE / FACT_MULTI_CHOICE)
+    # =========================================================================
+    if task_plan and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}:
+        try:
+            from app.generation.answer_composer import answer_composer
+            from app.retrieval.option_verifier import option_verifier
+            mt_data = retrieval_diagnostics.get("multi_target") or normalized
+            verify_response = option_verifier.verify(task_plan, mt_data)
+            logger.info(
+                f"[AnswerGenerator] 选项验证完成 | task_type={task_type} | status={verify_response.status} | selected={verify_response.selected_options}"
+            )
+
+            if verify_response.status == "SUCCESS" and verify_response.selected_options:
+                ans_text = answer_composer.compose_fact_choice_answer(
+                    verify_response, task_plan, normalized
+                )
+
+                citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
+                result = AnswerResult(
+                    status="answered",
+                    answer=ans_text,
+                    evidence=normalized,
+                    risk_tips=["本选项判定由事实比对引擎逐项独立验证完成，严格依据官方制度条款。"],
+                    confidence=0.98,
+                    citations=citations,
+                    verification={
+                        "passed": True,
+                        "issues": [],
+                        "option_verification": verify_response.to_dict(),
+                        "intermediate_verification": verify_response.intermediate_verification,
+                    },
+                    question=str(question or "").strip(),
+                ).to_dict()
+                return _attach_retrieval_context(
+                    result,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+            elif verify_response.status in {"NO_DECISION", "CONFLICTING", "FAILED"}:
+                err_code = "CONFLICTING_EVIDENCE" if verify_response.status == "CONFLICTING" else "INSUFFICIENT_OPTIONS"
+                logger.warning(f"[AnswerGenerator] 选项验证未通过 [{err_code}]: {verify_response.explanation}")
+                refusal = {
+                    "status": "no_evidence",
+                    "answer": f"⚠️ 经逐项条款比对，选项依据不足或存在冲突（{verify_response.explanation}），未能确定唯一正确选项。",
+                    "evidence": normalized,
+                    "risk_tips": ["知识库条款不足以支持明确选项判断"],
+                    "confidence": 0.0,
+                    "citations": [],
+                    "error_code": err_code,
+                    "verification": {
+                        "passed": False,
+                        "error_code": err_code,
+                        "issues": [err_code],
+                        "option_verification": verify_response.to_dict(),
+                        "intermediate_verification": verify_response.intermediate_verification,
+                    },
+                    "refusal_reason": err_code,
+                    "question": str(question or "").strip(),
+                }
+                return _attach_retrieval_context(
+                    refusal,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+        except Exception as e:
+            logger.error(f"[AnswerGenerator] 选项验证引擎异常: {e}", exc_info=True)
+
+    # =========================================================================
+    # Step 1: Pre-Generation Evidence Verifier (5 Core Dimensions)
+    # =========================================================================
+    use_llm = generator is not None
+    verifier_result = evidence_verifier.verify(
+        question,
+        normalized,
+        query_analysis=query_analysis,
+        use_llm=use_llm,
+    )
     sufficiency = assess_evidence_sufficiency(
         question,
         normalized,
         min_overlap=min_evidence_overlap,
     )
-    if not sufficiency.sufficient:
-        refusal = build_refusal(question, sufficiency.reasons, normalized)
-        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+
+    if not verifier_result.answerable:
+        logger.info(
+            f"[AnswerGenerator] 证据核验未通过: reason_code='{verifier_result.reason_code}', "
+            f"reason='{verifier_result.reason}', missing={verifier_result.missing_information}"
+        )
+        if verifier_result.need_clarification:
+            clarification_msg = verifier_result.missing_information[0] if verifier_result.missing_information else verifier_result.reason
+            refusal = {
+                "status": "needs_clarification",
+                "answer": clarification_msg,
+                "evidence": normalized,
+                "risk_tips": [f"需要补充场景条件：{verifier_result.reason}"],
+                "confidence": 0.0,
+                "citations": [],
+                "error_code": "AMBIGUOUS_QUERY",
+                "verification": {
+                    "passed": False,
+                    "error_code": "AMBIGUOUS_QUERY",
+                    "issues": [verifier_result.reason],
+                    "sufficiency": sufficiency.to_dict(),
+                    "evidence_verifier": verifier_result.to_dict(),
+                },
+                "refusal_reason": "AMBIGUOUS_QUERY",
+                "question": str(question or "").strip(),
+            }
+        else:
+            refusal_reasons = [verifier_result.reason] + verifier_result.missing_information
+            err_code = (
+                "CONFLICTING_EVIDENCE"
+                if verifier_result.reason_code == "CONFLICTING_EVIDENCE"
+                else "MISSING_EVIDENCE"
+            )
+            refusal = build_refusal(
+                question,
+                refusal_reasons,
+                normalized,
+                error_code=err_code,
+                reason_code=verifier_result.reason_code,
+                missing_information=verifier_result.missing_information,
+            )
+            refusal["error_code"] = err_code
+            refusal["verification"]["error_code"] = err_code
+            refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+            refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+
         return _attach_retrieval_context(
             refusal,
             retrieval_status,
@@ -69,11 +304,105 @@ def generate_answer(
             retrieval_diagnostics,
         )
 
-    try:
-        generated = (generator or _extractive_generator)(str(question or "").strip(), normalized)
-    except Exception:
-        refusal = build_refusal(question, ["答案生成服务调用失败。"], normalized)
+    if not sufficiency.sufficient:
+        logger.info(f"[AnswerGenerator] 证据充分性评估未通过: reasons={sufficiency.reasons}")
+        refusal = build_refusal(question, sufficiency.reasons, normalized)
         refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+        return _attach_retrieval_context(
+            refusal,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
+
+    # =========================================================================
+    # Step 2: Dedicated Compliance Judgment Workflow (qa_type=COMPLIANCE_JUDGMENT)
+    # =========================================================================
+    is_compliance_q = any(
+        w in str(question or "")
+        for w in ("合规吗", "是否合规", "能否办理", "是否违规", "是否允许", "合规判定", "是否符合监管")
+    ) or (query_analysis and getattr(query_analysis, "rule_type", "") in {"合规判断", "COMPLIANCE_JUDGMENT"})
+
+    if is_compliance_q:
+        try:
+            from app.compliance.compliance_engine import compliance_engine
+            compliance_verdict = compliance_engine.evaluate(str(question or "").strip(), normalized)
+            if not compliance_verdict.is_ready:
+                logger.info(f"[AnswerGenerator] 合规判断缺失关键事实: {compliance_verdict.missing_critical_fact}")
+                refusal = {
+                    "status": "needs_clarification",
+                    "answer": f"💡 **请补充合规判定关键事实**：\n{compliance_verdict.clarification_prompt}",
+                    "evidence": normalized,
+                    "risk_tips": [f"缺少合规判定关键事实：{compliance_verdict.missing_critical_fact}"],
+                    "confidence": 0.0,
+                    "citations": [],
+                    "verification": {
+                        "passed": False,
+                        "issues": [compliance_verdict.missing_critical_fact or "缺少必要数据"],
+                        "sufficiency": sufficiency.to_dict(),
+                        "evidence_verifier": verifier_result.to_dict(),
+                        "compliance": compliance_verdict.to_dict(),
+                    },
+                    "refusal_reason": compliance_verdict.missing_critical_fact or "缺少必要数据",
+                    "question": str(question or "").strip(),
+                }
+                return _attach_retrieval_context(
+                    refusal,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+
+            if compliance_verdict.rule_type != "GENERAL_COMPLIANCE":
+                logger.info(f"[AnswerGenerator] 合规判断完成确定性核算与规则比对: verdict={compliance_verdict.judgment}")
+                compliance_answer = compliance_verdict.to_formatted_answer()
+                result = AnswerResult(
+                    status="answered",
+                    answer=compliance_answer,
+                    evidence=normalized,
+                    risk_tips=["合规判断由确定性计算引擎完成，并经监管规则比对核验。"],
+                    confidence=0.99,
+                    citations=compliance_verdict.citations or [normalized[0].get("citation_id", "E1")],
+                    verification={
+                        "passed": True,
+                        "issues": [],
+                        "numeric_claims": [],
+                        "date_claims": [],
+                        "document_no_claims": [],
+                        "institution_claims": [],
+                        "unsupported_claims": [],
+                        "evidence_verifier": verifier_result.to_dict(),
+                        "compliance": compliance_verdict.to_dict(),
+                    },
+                    question=str(question or "").strip(),
+                ).to_dict()
+                return _attach_retrieval_context(
+                    result,
+                    retrieval_status,
+                    retrieval_guidance,
+                    retrieval_diagnostics,
+                )
+        except Exception as e:
+            logger.warning(f"[AnswerGenerator] 合规引擎处理异常，回退常规生成流程: {e}", exc_info=True)
+
+    evidence_for_gen = normalized
+    if verifier_result.supporting_evidence_ids:
+        supporting_set = set(verifier_result.supporting_evidence_ids)
+        verified_evidence = [e for e in normalized if e.get("citation_id") in supporting_set]
+        if verified_evidence:
+            evidence_for_gen = verified_evidence
+
+    gen_mode = "DeepSeek/LLM" if generator else "Extractive Fallback"
+    logger.info(f"[AnswerGenerator] 启动回答生成 | 模式: {gen_mode} | 确认有效证据数: {len(evidence_for_gen)}条")
+
+    try:
+        generated = (generator or _extractive_generator)(str(question or "").strip(), evidence_for_gen)
+    except Exception as exc:
+        logger.error(f"[AnswerGenerator] 答案生成服务调用异常: {type(exc).__name__}: {exc}", exc_info=True)
+        refusal = build_refusal(question, [f"答案生成服务调用失败: {exc}"], normalized)
+        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
         return _attach_retrieval_context(
             refusal,
             retrieval_status,
@@ -81,7 +410,74 @@ def generate_answer(
             retrieval_diagnostics,
         )
     answer_text = str(generated or "").strip()
+    if answer_text.upper() == "REFUSE" or answer_text.upper().startswith("REFUSE"):
+        logger.info("[AnswerGenerator] 生成后端判定证据不足，进入安全拒答流程")
+        refusal = build_refusal(question, ["依据现有证据不足以得出确定性结论，系统已安全拒答。"], normalized)
+        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+        return _attach_retrieval_context(
+            refusal,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
+
+    # If the answer is missing explicit [E#] citation brackets but evidence is present, append the first citation
+    if normalized and not re.search(r"\[(E\d+)\]|\b(E\d+)\b", answer_text, re.IGNORECASE):
+        first_cite = normalized[0].get("citation_id", "E1")
+        answer_text = f"{answer_text} [{first_cite}]"
+        logger.info(f"[AnswerGenerator] 自动为回答补全证据引用 [{first_cite}]")
+
+    initial_answer_text = answer_text
     verification = verify_answer(answer_text, normalized, question=question)
+    grounding_action = "PASS"
+    regeneration_triggered = False
+
+    if verification.get("status") == "PARTIAL_PASS":
+        logger.info(
+            f"[AnswerGenerator] 答案触发 PARTIAL_PASS，执行非核心无依据修剪: "
+            f"ungrounded_optional={len(verification.get('unsupported_optional_claims', []))}条"
+        )
+        answer_text = verification.get("pruned_answer") or answer_text
+        grounding_action = "REMOVE_OPTIONAL"
+    elif verification.get("status") == "FAIL":
+        logger.warning(f"[AnswerGenerator] 答案初次生成校验 FAIL: issues={verification['issues']}")
+        # Attempt 1-shot Grounded Regeneration if using DeepSeek backend
+        try:
+            from app.generation.deepseek_client import deepseek_generator, deepseek_grounded_regenerator, deepseek_enabled
+            is_deepseek_gen = (generator is None) or (generator is deepseek_generator)
+            if is_deepseek_gen and deepseek_enabled():
+                logger.info(f"[AnswerGenerator] 启动 Grounded Regeneration 受控修复生成...")
+                regen_text = deepseek_grounded_regenerator(
+                    str(question or "").strip(),
+                    evidence_for_gen,
+                    verification.get("issues"),
+                )
+                regen_text = str(regen_text or "").strip()
+                if regen_text and regen_text.upper() != "REFUSE":
+                    regeneration_triggered = True
+                    if normalized and not re.search(r"\[(E\d+)\]|\b(E\d+)\b", regen_text, re.IGNORECASE):
+                        first_cite = normalized[0].get("citation_id", "E1")
+                        regen_text = f"{regen_text} [{first_cite}]"
+
+                    regen_ver = verify_answer(regen_text, normalized, question=question)
+                    if regen_ver["passed"]:
+                        logger.info(f"[AnswerGenerator] Grounded Regeneration 修正成功 (status={regen_ver['status']})")
+                        answer_text = regen_ver.get("pruned_answer") or regen_text
+                        verification = regen_ver
+                        grounding_action = "REGENERATE"
+                    else:
+                        logger.warning(f"[AnswerGenerator] Grounded Regeneration 重生后仍未通过: issues={regen_ver['issues']}")
+                        verification = regen_ver
+                        grounding_action = "REJECT"
+                else:
+                    grounding_action = "REJECT"
+            else:
+                grounding_action = "REJECT"
+        except Exception as e:
+            logger.warning(f"[AnswerGenerator] Grounded Regeneration 执行异常: {e}")
+            grounding_action = "REJECT"
+
     risk_tips: list[str] = []
     status = "answered"
     refusal_reason = ""
@@ -90,15 +486,21 @@ def generate_answer(
         status = "refused"
         refusal_reason = "；".join(verification["issues"])
         risk_tips.extend(verification["issues"])
-        answer_text = "当前生成内容未通过证据校验，系统已拒绝输出未经核验的结论。"
+        answer_text = "依据当前检索证据无法得出充分支持的核心事实结论，系统已安全拒答。"
+        logger.warning(f"[AnswerGenerator] 答案最终未通过事实校验: issues={verification['issues']}")
     elif _has_multiple_scopes(normalized):
         risk_tips.append("证据来自不同文档或期间，使用前请确认适用范围和时点。")
+    elif verification.get("status") == "PARTIAL_PASS":
+        risk_tips.append("提示：已自动修剪未经证据支持的非核心描述，仅保留证据可确认内容。")
 
     if retrieval_status == "degraded":
         risk_tips.append(_degraded_risk_tip(retrieval_diagnostics))
 
     citations = verification.get("citations") or [item["citation_id"] for item in normalized]
     confidence = _estimate_confidence(normalized, verification, sufficiency.overlap)
+    logger.info(
+        f"[AnswerGenerator] 答案生成及校验完成 | 状态: {status} | GroundingAction: {grounding_action} | 置信度: {confidence:.2f} | 引用数: {len(citations)}"
+    )
     result = AnswerResult(
         status=status,
         answer=answer_text,
@@ -106,7 +508,14 @@ def generate_answer(
         risk_tips=risk_tips,
         confidence=confidence if status == "answered" else 0.0,
         citations=citations,
-        verification={**verification, "sufficiency": sufficiency.to_dict()},
+        verification={
+            **verification,
+            "sufficiency": sufficiency.to_dict(),
+            "evidence_verifier": verifier_result.to_dict(),
+            "grounding_action": grounding_action,
+            "regeneration_triggered": regeneration_triggered,
+            "initial_answer": initial_answer_text,
+        },
         refusal_reason=refusal_reason,
         question=str(question or "").strip(),
     )
@@ -136,17 +545,38 @@ def _handle_retrieval_gate(
         may_generate = retrieval_status in {"answerable", "degraded"} and bool(evidence)
 
     if retrieval_status == "no_evidence" or action == "refuse":
+        err_code = "RETRIEVAL_FAILED" if not evidence else "MISSING_EVIDENCE"
         refusal = build_refusal(
             question,
-            [str(guidance.get("reason") or "模块3未找到足够的可靠证据。")],
+            [str(guidance.get("reason") or "未检索到足够的可靠证据。")],
             evidence,
+            error_code=err_code,
+            reason_code="NO_RELEVANT_EVIDENCE",
         )
         refusal["status"] = "no_evidence" if retrieval_status == "no_evidence" else "refused"
+        refusal["error_code"] = err_code
+        refusal["verification"]["error_code"] = err_code
         return _attach_retrieval_context(
             refusal, retrieval_status, guidance, diagnostics
         )
 
-    if retrieval_status == "needs_clarification" or action == "clarify" or not may_generate:
+    if retrieval_status == "needs_clarification" or action == "clarify":
+        # Prompt 7 Guard: Choice, comparison, calculation, and multi-quote queries NEVER trigger clarification
+        if any(c in question for c in ("A:", "A.", "A：", "A、", "比较", "相差", "差距", "从", "到", "谁最大", "谁最小", "哪项", "最高", "最低")) or len(re.findall(r"“[^”]+”|‘[^’]+’|《[^》]+》", question)) >= 2:
+            refusal = build_refusal(
+                question,
+                ["知识库中未检索到与查询目标匹配的有效条款或表格数据。"],
+                evidence,
+                error_code="MISSING_EVIDENCE",
+                reason_code="NO_RELEVANT_EVIDENCE",
+            )
+            refusal["status"] = "no_evidence"
+            refusal["error_code"] = "MISSING_EVIDENCE"
+            refusal["verification"]["error_code"] = "MISSING_EVIDENCE"
+            return _attach_retrieval_context(
+                refusal, "no_evidence", guidance, diagnostics
+            )
+
         clarification = str(guidance.get("clarification_question") or "请补充问题中的适用对象或查询条件。")
         options = guidance.get("clarification_options")
         payload = {
@@ -156,10 +586,12 @@ def _handle_retrieval_gate(
             "risk_tips": ["信息条件不足，系统未生成确定性答案。"],
             "confidence": 0.0,
             "citations": [],
+            "error_code": "AMBIGUOUS_QUERY",
             "verification": {
                 "passed": False,
-                "issues": ["模块3要求先澄清问题条件。"],
-                "sufficiency": {"sufficient": False, "reasons": ["模块3要求先澄清问题条件。"]},
+                "error_code": "AMBIGUOUS_QUERY",
+                "issues": ["问题要素不足，需先澄清查询条件。"],
+                "sufficiency": {"sufficient": False, "reasons": ["问题要素不足，需先澄清查询条件。"]},
             },
             "clarification_question": clarification,
             "question": str(question or "").strip(),

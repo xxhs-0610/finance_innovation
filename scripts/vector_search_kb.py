@@ -6,8 +6,9 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+for path_str in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 from app.indexing.index_reader import KnowledgeBaseReader
 

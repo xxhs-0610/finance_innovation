@@ -187,6 +187,52 @@ class MockRAGService {
         genLatency: '360ms'
       },
       riskTip: '提示：本回答由 RegTrust-RAG 知识库检索生成，建议结合具体业务情景及最新监管公文核验。'
+  static getIndexesStatus() {
+    return {
+      status: "healthy",
+      indexes_dir: "indexes/kb_rebuild",
+      is_ready: true,
+      summary: {
+        total_chunks: 125166,
+        clause_chunks: 22880,
+        table_chunks: 102286,
+        document_count: 500,
+        embedding_dimension: 512,
+        embedding_model: "Model/bge-small-zh-v1.5",
+        similarity_metric: "Cosine (Inner Product on Normalized Vectors)",
+        fusion_strategy: "RRF (Reciprocal Rank Fusion) + Rule/Model Reranker",
+        total_storage_bytes: 590444044,
+        total_storage_formatted: "563.1 MB"
+      },
+      files: [
+        { filename: "faiss.index", description: "FAISS 密集向量索引 (IndexFlatIP)", exists: true, size_formatted: "244.5 MB", size_bytes: 256340013 },
+        { filename: "embeddings.npy", description: "NumPy 向量矩阵 (float32, 512维)", exists: true, size_formatted: "244.5 MB", size_bytes: 256340096 },
+        { filename: "chunk_id_map.json", description: "向量序号到 Chunk ID 业务主键映射表", exists: true, size_formatted: "13.7 MB", size_bytes: 14413559 },
+        { filename: "vector_meta.json", description: "向量索引元数据与构建参数配置", exists: true, size_formatted: "940 B", size_bytes: 940 },
+        { filename: "bm25_corpus.jsonl", description: "BM25 倒排检索文本语料库", exists: true, size_formatted: "60.4 MB", size_bytes: 63349436 }
+      ]
+    };
+  }
+
+  static verifyIndexes() {
+    return {
+      passed: true,
+      status: "ok",
+      latency_ms: 12.5,
+      vector_count: 125166,
+      dimension: 512,
+      checks: {
+        faiss_index_exists: true,
+        embeddings_exists: true,
+        chunk_id_map_exists: true,
+        vector_meta_exists: true,
+        bm25_corpus_exists: true,
+        faiss_readable: true,
+        vector_count_match: true,
+        local_model_exists: true
+      },
+      issues: [],
+      message: "索引全量健康检查通过，FAISS 向量与 BM25 倒排索引完全就绪"
     };
   }
 

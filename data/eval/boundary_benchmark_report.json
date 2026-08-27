@@ -1,0 +1,262 @@
+{
+  "timestamp": "2026-08-27 15:43:49",
+  "total_samples": 115,
+  "total_latency_ms": 156466,
+  "router_accuracy": 1.0,
+  "intent_metrics": {
+    "DOMAIN_QA": {
+      "TP": 40,
+      "FP": 0,
+      "FN": 0,
+      "Precision": 1.0,
+      "Recall": 1.0,
+      "F1_score": 1.0
+    },
+    "OUT_OF_SCOPE": {
+      "TP": 45,
+      "FP": 0,
+      "FN": 0,
+      "Precision": 1.0,
+      "Recall": 1.0,
+      "F1_score": 1.0
+    },
+    "SYSTEM_META": {
+      "TP": 15,
+      "FP": 0,
+      "FN": 0,
+      "Precision": 1.0,
+      "Recall": 1.0,
+      "F1_score": 1.0
+    },
+    "NEED_CLARIFICATION": {
+      "TP": 15,
+      "FP": 0,
+      "FN": 0,
+      "Precision": 1.0,
+      "Recall": 1.0,
+      "F1_score": 1.0
+    }
+  },
+  "category_metrics": {
+    "A_DOMAIN_QA": {
+      "name": "A类：明显领域内",
+      "total": 25,
+      "correct": 25,
+      "accuracy": 1.0
+    },
+    "B_OUT_OF_SCOPE_OBVIOUS": {
+      "name": "B类：明显领域外",
+      "total": 20,
+      "correct": 20,
+      "accuracy": 1.0
+    },
+    "C_OUT_OF_SCOPE_BANK_ADJACENT": {
+      "name": "C类：银行金融相关但实际领域外",
+      "total": 25,
+      "correct": 25,
+      "accuracy": 1.0
+    },
+    "D_SYSTEM_META": {
+      "name": "D类：系统自身问题",
+      "total": 15,
+      "correct": 15,
+      "accuracy": 1.0
+    },
+    "E_NEED_CLARIFICATION": {
+      "name": "E类：信息不足",
+      "total": 15,
+      "correct": 15,
+      "accuracy": 1.0
+    },
+    "F_DOMAIN_QA_INSUFFICIENT_EVIDENCE": {
+      "name": "F类：领域内但知识库证据不足",
+      "total": 15,
+      "correct": 15,
+      "accuracy": 1.0
+    }
+  },
+  "confusion_matrix": {
+    "DOMAIN_QA": {
+      "DOMAIN_QA": 40,
+      "OUT_OF_SCOPE": 0,
+      "SYSTEM_META": 0,
+      "NEED_CLARIFICATION": 0
+    },
+    "OUT_OF_SCOPE": {
+      "DOMAIN_QA": 0,
+      "OUT_OF_SCOPE": 45,
+      "SYSTEM_META": 0,
+      "NEED_CLARIFICATION": 0
+    },
+    "SYSTEM_META": {
+      "DOMAIN_QA": 0,
+      "OUT_OF_SCOPE": 0,
+      "SYSTEM_META": 15,
+      "NEED_CLARIFICATION": 0
+    },
+    "NEED_CLARIFICATION": {
+      "DOMAIN_QA": 0,
+      "OUT_OF_SCOPE": 0,
+      "SYSTEM_META": 0,
+      "NEED_CLARIFICATION": 15
+    }
+  },
+  "class_f_analysis": {
+    "total": 15,
+    "router_domain_qa_count": 15,
+    "verifier_blocked_count": 15,
+    "details": [
+      {
+        "id": "F01",
+        "question": "2035年国家金融监督管理总局银行业监管统计信息发布日程表是怎样的？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F02",
+        "question": "《商业银行资本管理办法》附件99关于量子计算资产的计量规定是什么？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F03",
+        "question": "银行业监管统计资料保存几年？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "NO_RELEVANT_EVIDENCE",
+        "status": "refused",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F04",
+        "question": "2024年和2025年火星开发金融租赁公司的总资产分别是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "INSUFFICIENT_COVERAGE",
+        "status": "refused",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F05",
+        "question": "《消费金融公司管理办法》第九百九十九条规定了什么？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F06",
+        "question": "2024年二季度某特定未公开内部村镇银行的核心一级资本充足率具体数值是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "NO_RELEVANT_EVIDENCE",
+        "status": "needs_clarification",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F07",
+        "question": "2011年某省份保险公司原保险保费收入月度明细是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F08",
+        "question": "银行业金融机构绿色信贷评价指标中生物多样性贷款的具体折算系数是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "NO_RELEVANT_EVIDENCE",
+        "status": "refused",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F09",
+        "question": "2026年12月全国各地区原保险保费收入情况表数值是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F10",
+        "question": "《商业银行大额风险暴露管理办法》第七十二条第二款的具体文字表述是什么？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F11",
+        "question": "商业银行特定信托收益权投资在2026年季度的准确全口径统计总额是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "needs_clarification",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F12",
+        "question": "农村商业银行开办数字人民币跨境结算业务的专项资本计提折算率是多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "NO_RELEVANT_EVIDENCE",
+        "status": "refused",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F13",
+        "question": "2025年四季度金融租赁公司航空器租赁资产全行业坏账率具体为多少？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "needs_clarification",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F14",
+        "question": "《商业银行资本管理办法》附件30所列的特殊豁免清单内容是什么？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": null,
+        "status": "no_evidence",
+        "verifier_properly_blocked": true
+      },
+      {
+        "id": "F15",
+        "question": "某银行董事李某办理一笔特定抵质押信贷业务是否经总行审批合规？",
+        "router_intent": "DOMAIN_QA",
+        "router_correct": true,
+        "verifier_answerable": false,
+        "verifier_reason_code": "NO_RELEVANT_EVIDENCE",
+        "status": "refused",
+        "verifier_properly_blocked": true
+      }
+    ]
+  },
+  "misclassified_samples": []
+}

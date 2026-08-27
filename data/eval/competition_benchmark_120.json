@@ -1,0 +1,2122 @@
+[
+  {
+    "id": "LK_01",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，银行存款是多少？",
+    "expected_status": "answered",
+    "expected_value": 27154.34,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "银行存款",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_02",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，资金运用余额是多少？",
+    "expected_status": "answered",
+    "expected_value": 281573.61,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "资金运用余额",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_03",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，债券投资是多少？",
+    "expected_status": "answered",
+    "expected_value": 125746.88,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "债券",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_04",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，股票投资是多少？",
+    "expected_status": "answered",
+    "expected_value": 20236.45,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "股票",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_05",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，证券投资基金是多少？",
+    "expected_status": "answered",
+    "expected_value": 11175.2,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "证券投资基金",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_06",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，年化综合收益率是多少？",
+    "expected_status": "answered",
+    "expected_value": 3.22,
+    "expected_unit": "%",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "年化综合收益率",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_07",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，年化财务收益率是多少？",
+    "expected_status": "answered",
+    "expected_value": 2.81,
+    "expected_unit": "%",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "年化财务收益率",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_08",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的原保险保费收入是多少？",
+    "expected_status": "answered",
+    "expected_value": 51246.71,
+    "expected_unit": "亿元",
+    "target_document": "2023年12月全国各地区原保险保费收入情况表",
+    "target_metric": "合计",
+    "target_scope": "原保险保费收入",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_09",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的健康险保费收入是多少？",
+    "expected_status": "answered",
+    "expected_value": 9034.54,
+    "expected_unit": "亿元",
+    "target_document": "2023年12月全国各地区原保险保费收入情况表",
+    "target_metric": "健康险",
+    "target_scope": "原保险保费收入",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_10",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的意外险保费收入是多少？",
+    "expected_status": "answered",
+    "expected_value": 852.12,
+    "expected_unit": "亿元",
+    "target_document": "2023年12月全国各地区原保险保费收入情况表",
+    "target_metric": "意外险",
+    "target_scope": "原保险保费收入",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_11",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的财产险保费收入是多少？",
+    "expected_status": "answered",
+    "expected_value": 13601.88,
+    "expected_unit": "亿元",
+    "target_document": "2023年12月全国各地区原保险保费收入情况表",
+    "target_metric": "财产险",
+    "target_scope": "原保险保费收入",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_12",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的人身险保费收入是多少？",
+    "expected_status": "answered",
+    "expected_value": 37644.83,
+    "expected_unit": "亿元",
+    "target_document": "2023年12月全国各地区原保险保费收入情况表",
+    "target_metric": "人身险",
+    "target_scope": "原保险保费收入",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_13",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行核心一级资本充足率是多少？",
+    "expected_status": "answered",
+    "expected_value": 10.82,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "核心一级资本充足率",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_14",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行一级资本充足率是多少？",
+    "expected_status": "answered",
+    "expected_value": 12.35,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "一级资本充足率",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_15",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行资本充足率是多少？",
+    "expected_status": "answered",
+    "expected_value": 15.62,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "资本充足率",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_16",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行不良贷款率是多少？",
+    "expected_status": "answered",
+    "expected_value": 1.56,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "不良贷款率",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_17",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行拨备覆盖率是多少？",
+    "expected_status": "answered",
+    "expected_value": 209.48,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "拨备覆盖率",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_18",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行净息差是多少？",
+    "expected_status": "answered",
+    "expected_value": 1.52,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "净息差",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_19",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2024年商业银行主要监管指标情况表》中，2024年四季度商业银行流动性比例是多少？",
+    "expected_status": "answered",
+    "expected_value": 68.55,
+    "expected_unit": "%",
+    "target_document": "2024年商业银行主要监管指标情况表",
+    "target_metric": "流动性比例",
+    "target_scope": "2024年四季度",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "LK_20",
+    "category": "TABLE_LOOKUP",
+    "task_type": "TABLE_LOOKUP",
+    "question": "在《2023年4季度保险业资金运用情况表》中，长期股权投资在“截至当期-账面余额”口径下是多少？",
+    "expected_status": "answered",
+    "expected_value": 23120.1,
+    "expected_unit": "亿元",
+    "target_document": "2023年4季度保险业资金运用情况表",
+    "target_metric": "长期股权投资",
+    "target_scope": "截至当期-账面余额",
+    "test_dimensions": [
+      "value_extraction_accuracy",
+      "unit_alignment",
+      "doc_alignment"
+    ]
+  },
+  {
+    "id": "CP_01",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，以下哪项最高？\nA.年化综合收益率\nB.年化财务收益率\nC.资金运用余额\nD.银行存款",
+    "expected_status": "answered",
+    "expected_winner": "C",
+    "operation": "MAX",
+    "candidate_count": 4,
+    "candidates": [
+      "年化综合收益率",
+      "年化财务收益率",
+      "资金运用余额",
+      "银行存款"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_02",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，以下哪项最低？\nA.年化财务收益率\nB.年化综合收益率\nC.资金运用余额\nD.银行存款",
+    "expected_status": "answered",
+    "expected_winner": "A",
+    "operation": "MIN",
+    "candidate_count": 4,
+    "candidates": [
+      "年化财务收益率",
+      "年化综合收益率",
+      "资金运用余额",
+      "银行存款"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_03",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，银行存款和股票投资哪项更高？",
+    "expected_status": "answered",
+    "expected_winner": "银行存款",
+    "operation": "MAX",
+    "candidate_count": 2,
+    "candidates": [
+      "银行存款",
+      "股票"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_04",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，年化财务收益率与年化综合收益率谁更低？",
+    "expected_status": "answered",
+    "expected_winner": "年化财务收益率",
+    "operation": "MIN",
+    "candidate_count": 2,
+    "candidates": [
+      "年化财务收益率",
+      "年化综合收益率"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_05",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，以下哪项数值最高？\nA.股票\nB.债券\nC.银行存款\nD.证券投资基金",
+    "expected_status": "answered",
+    "expected_winner": "B",
+    "operation": "MAX",
+    "candidate_count": 4,
+    "candidates": [
+      "股票",
+      "债券",
+      "银行存款",
+      "证券投资基金"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_06",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，以下哪项数值最低？\nA.股票\nB.债券\nC.银行存款\nD.证券投资基金",
+    "expected_status": "answered",
+    "expected_winner": "D",
+    "operation": "MIN",
+    "candidate_count": 4,
+    "candidates": [
+      "股票",
+      "债券",
+      "银行存款",
+      "证券投资基金"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_07",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，健康险和意外险哪个保费收入更多？",
+    "expected_status": "answered",
+    "expected_winner": "健康险",
+    "operation": "MAX",
+    "candidate_count": 2,
+    "candidates": [
+      "健康险",
+      "意外险"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_08",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，财产险和人身险哪个保费收入更少？",
+    "expected_status": "answered",
+    "expected_winner": "财产险",
+    "operation": "MIN",
+    "candidate_count": 2,
+    "candidates": [
+      "财产险",
+      "人身险"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_09",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，以下险种保费收入最高的是？\nA.人身险\nB.财产险\nC.健康险\nD.意外险",
+    "expected_status": "answered",
+    "expected_winner": "A",
+    "operation": "MAX",
+    "candidate_count": 4,
+    "candidates": [
+      "人身险",
+      "财产险",
+      "健康险",
+      "意外险"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_10",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，以下险种保费收入最低的是？\nA.人身险\nB.财产险\nC.健康险\nD.意外险",
+    "expected_status": "answered",
+    "expected_winner": "D",
+    "operation": "MIN",
+    "candidate_count": 4,
+    "candidates": [
+      "人身险",
+      "财产险",
+      "健康险",
+      "意外险"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_11",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2024年商业银行主要监管指标情况表》中，核心一级资本充足率和资本充足率哪个更高？",
+    "expected_status": "answered",
+    "expected_winner": "资本充足率",
+    "operation": "MAX",
+    "candidate_count": 2,
+    "candidates": [
+      "核心一级资本充足率",
+      "资本充足率"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_12",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2024年商业银行主要监管指标情况表》中，以下三类资本充足率哪项最低？\nA.资本充足率\nB.一级资本充足率\nC.核心一级资本充足率",
+    "expected_status": "answered",
+    "expected_winner": "C",
+    "operation": "MIN",
+    "candidate_count": 3,
+    "candidates": [
+      "资本充足率",
+      "一级资本充足率",
+      "核心一级资本充足率"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_13",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2024年商业银行主要监管指标情况表》中，商业银行净息差和不良贷款率谁更低？",
+    "expected_status": "answered",
+    "expected_winner": "净息差",
+    "operation": "MIN",
+    "candidate_count": 2,
+    "candidates": [
+      "净息差",
+      "不良贷款率"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_14",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，长期股权投资与证券投资基金谁的账面余额更高？",
+    "expected_status": "answered",
+    "expected_winner": "长期股权投资",
+    "operation": "MAX",
+    "candidate_count": 2,
+    "candidates": [
+      "长期股权投资",
+      "证券投资基金"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_15",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，寿险与健康险哪项保费规模更大？",
+    "expected_status": "answered",
+    "expected_winner": "寿险",
+    "operation": "MAX",
+    "candidate_count": 2,
+    "candidates": [
+      "寿险",
+      "健康险"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_16",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，比较债券与资金运用余额谁更小？",
+    "expected_status": "answered",
+    "expected_winner": "债券",
+    "operation": "MIN",
+    "candidate_count": 2,
+    "candidates": [
+      "债券",
+      "资金运用余额"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_17",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，以下哪项最高？\nA.银行存款\nB.股票\nC.债券\nD.长期股权投资",
+    "expected_status": "answered",
+    "expected_winner": "C",
+    "operation": "MAX",
+    "candidate_count": 4,
+    "candidates": [
+      "银行存款",
+      "股票",
+      "债券",
+      "长期股权投资"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_18",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，以下哪项最低？\nA.银行存款\nB.股票\nC.债券\nD.长期股权投资",
+    "expected_status": "answered",
+    "expected_winner": "B",
+    "operation": "MIN",
+    "candidate_count": 4,
+    "candidates": [
+      "银行存款",
+      "股票",
+      "债券",
+      "长期股权投资"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_19",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2024年商业银行主要监管指标情况表》中，核心一级资本充足率与一级资本充足率谁更小？",
+    "expected_status": "answered",
+    "expected_winner": "核心一级资本充足率",
+    "operation": "MIN",
+    "candidate_count": 2,
+    "candidates": [
+      "核心一级资本充足率",
+      "一级资本充足率"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CP_20",
+    "category": "TABLE_COMPARE",
+    "task_type": "TABLE_COMPARE",
+    "question": "在《2023年4季度保险业资金运用情况表》中，资金运用余额、银行存款、股票投资按大小比较谁最大？",
+    "expected_status": "answered",
+    "expected_winner": "资金运用余额",
+    "operation": "MAX",
+    "candidate_count": 3,
+    "candidates": [
+      "资金运用余额",
+      "银行存款",
+      "股票"
+    ],
+    "test_dimensions": [
+      "candidate_recall_rate",
+      "comparison_accuracy",
+      "deterministic_max_min"
+    ]
+  },
+  {
+    "id": "CALC_01",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，从全国合计的合计到健康险的数值变化约为多少？\nA. -42212.17\nB. -46433.39\nC. 37990.95\nD. -42200.00",
+    "expected_status": "answered",
+    "matched_option": "A",
+    "operation": "SUBTRACT",
+    "operands": [
+      "合计",
+      "健康险"
+    ],
+    "expected_result": -42212.17,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_02",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的健康险和意外险之和是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ADD",
+    "operands": [
+      "健康险",
+      "意外险"
+    ],
+    "expected_result": 9886.66,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_03",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的人身险减去健康险差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "人身险",
+      "健康险"
+    ],
+    "expected_result": 28610.29,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_04",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，全国合计的健康险与意外险差额绝对值是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ABS_DIFFERENCE",
+    "operands": [
+      "健康险",
+      "意外险"
+    ],
+    "expected_result": 8182.42,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_05",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，年化综合收益率减去年化财务收益率相差多少个百分点？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "年化综合收益率",
+      "年化财务收益率"
+    ],
+    "expected_result": 0.41,
+    "expected_unit": "%",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_06",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，债券和股票账面余额合计是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ADD",
+    "operands": [
+      "债券",
+      "股票"
+    ],
+    "expected_result": 145983.33,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_07",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，在“截至当期-账面余额”口径下，资金运用余额减去银行存款差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "资金运用余额",
+      "银行存款"
+    ],
+    "expected_result": 254419.27,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_08",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2024年商业银行主要监管指标情况表》中，资本充足率减去一级资本充足率差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "资本充足率",
+      "一级资本充足率"
+    ],
+    "expected_result": 3.27,
+    "expected_unit": "%",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_09",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2024年商业银行主要监管指标情况表》中，一级资本充足率减去核心一级资本充足率差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "一级资本充足率",
+      "核心一级资本充足率"
+    ],
+    "expected_result": 1.53,
+    "expected_unit": "%",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_10",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，财产险与人身险总和是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ADD",
+    "operands": [
+      "财产险",
+      "人身险"
+    ],
+    "expected_result": 51246.71,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_11",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，股票与证券投资基金账面余额合计为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ADD",
+    "operands": [
+      "股票",
+      "证券投资基金"
+    ],
+    "expected_result": 31411.65,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_12",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，长期股权投资与股票账面余额差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "长期股权投资",
+      "股票"
+    ],
+    "expected_result": 2883.65,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_13",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2024年商业银行主要监管指标情况表》中，资本充足率减去核心一级资本充足率差额是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "SUBTRACT",
+    "operands": [
+      "资本充足率",
+      "核心一级资本充足率"
+    ],
+    "expected_result": 4.8,
+    "expected_unit": "%",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_14",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，健康险占合计保费收入的比值约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "RATIO",
+    "operands": [
+      "健康险",
+      "合计"
+    ],
+    "expected_result": 0.1763,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_15",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，人身险占合计保费收入的比值约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "RATIO",
+    "operands": [
+      "人身险",
+      "合计"
+    ],
+    "expected_result": 0.7346,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_16",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，财产险占合计保费收入的比值约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "RATIO",
+    "operands": [
+      "财产险",
+      "合计"
+    ],
+    "expected_result": 0.2654,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_17",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，银行存款占资金运用余额的比值约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "RATIO",
+    "operands": [
+      "银行存款",
+      "资金运用余额"
+    ],
+    "expected_result": 0.0964,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_18",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，债券占资金运用余额的比值约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "RATIO",
+    "operands": [
+      "债券",
+      "资金运用余额"
+    ],
+    "expected_result": 0.4466,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_19",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，年化综合收益率相对于年化财务收益率的增长率约为多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "CHANGE_RATE",
+    "operands": [
+      "年化财务收益率",
+      "年化综合收益率"
+    ],
+    "expected_result": 0.1459,
+    "expected_unit": "",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "CALC_20",
+    "category": "TABLE_CALCULATION",
+    "task_type": "TABLE_CALCULATION",
+    "question": "在《2023年4季度保险业资金运用情况表》中，债券与银行存款的差额绝对值是多少？",
+    "expected_status": "answered",
+    "matched_option": null,
+    "operation": "ABS_DIFFERENCE",
+    "operands": [
+      "债券",
+      "银行存款"
+    ],
+    "expected_result": 98592.54,
+    "expected_unit": "亿元",
+    "test_dimensions": [
+      "operand_recall",
+      "calculation_accuracy",
+      "option_match_accuracy"
+    ]
+  },
+  {
+    "id": "SC_01",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《消费金融公司管理办法》，以下关于消费金融公司设立原则的表述哪项正确？\nA. 消费金融公司是经国家金融监督管理总局批准设立、不吸收公众存款的非银行金融机构\nB. 消费金融公司可以面向公众吸收定期存款\nC. 消费金融公司可以从事外汇买卖投机业务\nD. 消费金融公司不受国家金融监督管理总局监管",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_02",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《消费金融公司管理办法》，消费金融公司的最低注册资本限额为多少？\nA. 1亿元人民币\nB. 3亿元人民币或等值的可自由兑换货币\nC. 5000万元人民币\nD. 10亿元人民币",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_03",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《消费金融公司管理办法》，消费金融公司主要出资人持股比例要求为？\nA. 不得低于拟设消费金融公司全部股本的10%\nB. 不得低于拟设消费金融公司全部股本的50%\nC. 必须达到100%控股\nD. 不设最低持股限制",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_04",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行核心一级资本充足率的最低监管要求是多少？\nA. 4%\nB. 5%\nC. 6%\nD. 8%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_05",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行一级资本充足率的最低监管要求是多少？\nA. 5%\nB. 6%\nC. 7%\nD. 8%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_06",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行资本充足率的最低监管要求是多少？\nA. 6%\nB. 7%\nC. 8%\nD. 10.5%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "C"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_07",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行储备资本要求是多少？\nA. 1.5%\nB. 2.5%\nC. 3.5%\nD. 4.0%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_08",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行大额风险暴露管理办法》，商业银行对非同业单一客户的贷款余额不得超过资本净额的多少？\nA. 10%\nB. 15%\nC. 20%\nD. 25%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "商业银行大额风险暴露管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_09",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行大额风险暴露管理办法》，商业银行对非同业单一客户的全部客户暴露不得超过一级资本净额的多少？\nA. 10%\nB. 15%\nC. 20%\nD. 25%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "商业银行大额风险暴露管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_10",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《金融租赁公司管理办法》，金融租赁公司的最低注册资本限额是多少？\nA. 1亿元人民币\nB. 3亿元人民币\nC. 10亿元人民币\nD. 5000万元人民币",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "金融租赁公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_11",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《金融租赁公司管理办法》，金融租赁公司主要出资人出资比例不得低于多少？\nA. 30%\nB. 50%\nC. 51%\nD. 20%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "金融租赁公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_12",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行理财业务监督管理办法》，商业银行应当设立专门的理财业务经营部门，实行？\nA. 单独核算、统一运营\nB. 单独核算、集中管理、独立运营\nC. 与信贷业务合并核算\nD. 委托外部中介机构独立核算",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "商业银行理财业务监督管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_13",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，第三档商业银行指？\nA. 规模小于100亿元且无跨国业务的商业银行\nB. 规模大于5000亿元的银行\nC. 系统重要性银行\nD. 所有外资银行分行",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_14",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《银行保险机构关联交易管理办法》，一般关联交易是指？\nA. 金额巨大需董事会审批的交易\nB. 除重大关联交易以外的其他关联交易\nC. 与控股股东的全部交易\nD. 与境外机构的交易",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "银行保险机构关联交易管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_15",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《消费金融公司管理办法》，消费金融公司杠杆率不得低于多少？\nA. 4%\nB. 5%\nC. 8%\nD. 10%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_16",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，第一档商业银行主要指？\nA. 资产规模大于或等于1000亿元或有重大跨境业务的商业银行\nB. 农村信用社\nC. 村镇银行\nD. 政策性银行",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_17",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行资本管理办法》，以下哪项属于核心一级资本？\nA. 实收资本或普通股\nB. 优先股\nC. 二级资本债\nD. 可转换债券",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_18",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《银行业监管统计管理办法》，银行业监管统计资料的保存期限一般不得少于？\nA. 1年\nB. 3年\nC. 5年\nD. 10年",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "C"
+    ],
+    "target_document": "银行业监管统计管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_19",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《消费金融公司管理办法》，消费金融公司开展资产证券化业务须开业至少几年？\nA. 1年\nB. 2年\nC. 3年\nD. 5年",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "B"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "SC_20",
+    "category": "FACT_SINGLE_CHOICE",
+    "task_type": "FACT_SINGLE_CHOICE",
+    "question": "根据《商业银行理财业务监督管理办法》，理财产品不得投资于？\nA. 国债\nB. 地方政府债券\nC. 商业银行发行的二级资本债\nD. 法律法规禁止投资的资产",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "D"
+    ],
+    "target_document": "商业银行理财业务监督管理办法",
+    "test_dimensions": [
+      "option_evidence_recall",
+      "option_verification_accuracy",
+      "final_choice_accuracy"
+    ]
+  },
+  {
+    "id": "MC_01",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《消费金融公司管理办法》，以下关于消费金融公司业务范围的描述，哪两项正确？\nA. 发放个人消费贷款\nB. 吸收公众活期存款\nC. 接受股东境内子公司及境内股东的存款\nD. 开展股票二级市场炒作业务",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "C"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_02",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行的核心一级资本包括哪些？\nA. 实收资本或普通股\nB. 资本公积\nC. 盈余公积和未分配利润\nD. 次级债券",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_03",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行三大资本充足率底线要求分别为？\nA. 核心一级资本充足率不低于5%\nB. 一级资本充足率不低于6%\nC. 资本充足率不低于8%\nD. 拨备覆盖率不低于150%",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_04",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行大额风险暴露管理办法》，下列属于大额风险暴露统计口径的有？\nA. 单一非同业客户暴露\nB. 一组关联非同业客户暴露\nC. 同业单一客户暴露\nD. 个人信用卡消费限额",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行大额风险暴露管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_05",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《金融租赁公司管理办法》，金融租赁公司可以经营的业务包括？\nA. 融资租赁业务\nB. 转让和受让融资租赁资产\nC. 固定收益类证券投资业务\nD. 吸收个人活期储蓄",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "金融租赁公司管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_06",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《消费金融公司管理办法》，申请设立消费金融公司的主要出资人应具备哪些条件？\nA. 财务状况良好，最近2个会计年度连续盈利\nB. 具有适合消费金融公司业务发展的行业背景\nC. 入股资金为自有资金，不得以委托资金入股\nD. 资产总额不低于1000亿元人民币",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_07",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，商业银行监管资本划分包括哪些级别？\nA. 核心一级资本\nB. 其他一级资本\nC. 二级资本\nD. 三级资本",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_08",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行理财业务监督管理办法》，商业银行理财产品按照投资性质可以分为哪些类别？\nA. 固定收益类理财产品\nB. 权益类理财产品\nC. 商品及金融衍生品类理财产品\nD. 混合类理财产品",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "target_document": "商业银行理财业务监督管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_09",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行理财业务监督管理办法》，理财产品销售应当遵循的原则包括？\nA. 诚实守信、勤勉尽职\nB. 买者自负、卖者尽责\nC. 风险匹配原则\nD. 保证本金收益原则",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行理财业务监督管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_10",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《银行保险机构关联交易管理办法》，以下哪些属于银行保险机构关联方？\nA. 控股股东、实际控制人\nB. 持有5%以上股权的股东\nC. 董事、监事及高级管理人员\nD. 购买理财产品的普通个人客户",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "银行保险机构关联交易管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_11",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行流动性风险管理办法》，商业银行流动性风险管理的核心监管指标包括？\nA. 流动性比例\nB. 流动性覆盖率\nC. 净稳定资金比例\nD. 贷款拨备率",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行流动性风险管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_12",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行大额风险暴露管理办法》，商业银行对客户的风险暴露计量范围包括哪些？\nA. 银行账簿资产\nB. 交易账簿资产\nC. 场外衍生工具\nD. 证券融资交易",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "target_document": "商业银行大额风险暴露管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_13",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《消费金融公司管理办法》，消费金融公司不得从事下列哪些活动？\nA. 吸收公众存款\nB. 违规向无还款能力的个人提供消费贷款\nC. 暴力催收或侵犯消费者个人隐私\nD. 提供小额分散消费贷款",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "消费金融公司管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_14",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，以下哪些属于市场风险计量的范围？\nA. 利率风险\nB. 汇率风险\nC. 股票风险\nD. 商品风险",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_15",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《金融租赁公司管理办法》，金融租赁公司的主要监管指标包括哪些？\nA. 资本充足率\nB. 杠杆率\nC. 拨备覆盖率\nD. 单一客户融资集中度",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "D"
+    ],
+    "target_document": "金融租赁公司管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_16",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行内部控制指引》，商业银行内部控制的四项基本原则包括哪些？\nA. 全覆盖原则\nB. 制衡性原则\nC. 审慎性原则\nD. 相匹配原则",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "target_document": "商业银行内部控制指引",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_17",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，以下关于逆周期资本要求的表述，哪些项正确？\nA. 0%至2.5%之间\nB. 由监管机构根据宏观审慎状况评估决定\nC. 必须始终保持在5%\nD. 仅对特定大型银行适用",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_18",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行理财业务监督管理办法》，理财托管机构应当履行的职责包括哪些？\nA. 安全保管理财产品财产\nB. 开立理财产品资金账户和证券账户\nC. 监督理财产品投资运作\nD. 替商业银行承担投资亏损",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C"
+    ],
+    "target_document": "商业银行理财业务监督管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_19",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《银行保险机构消费者权益保护管理办法》，银行保险机构保护消费者权益的核心要求包括哪些？\nA. 信息披露真实充分\nB. 严禁销售误导\nC. 保护消费者个人金融信息安全\nD. 畅通投诉渠道",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "target_document": "银行保险机构消费者权益保护管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "MC_20",
+    "category": "FACT_MULTI_CHOICE",
+    "task_type": "FACT_MULTI_CHOICE",
+    "question": "根据《商业银行资本管理办法》，第二档商业银行在资本计量上具有哪些特征？\nA. 采用简化标准法计量信用风险加权资产\nB. 豁免计量操作风险\nC. 适用差异化的监管披露要求\nD. 必须采用内部评级高级法",
+    "expected_status": "answered",
+    "expected_selected_options": [
+      "A",
+      "C"
+    ],
+    "target_document": "商业银行资本管理办法",
+    "test_dimensions": [
+      "per_option_precision",
+      "per_option_recall",
+      "exact_match_accuracy"
+    ]
+  },
+  {
+    "id": "FAIL_01",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "CLARIFY",
+    "question": "这个达到监管标准了吗？",
+    "expected_status": "needs_clarification",
+    "expected_error_code": "AMBIGUOUS_QUERY",
+    "reason": "问题缺少具体指标与机构名称",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_02",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "CLARIFY",
+    "question": "按照规定需要保存几年？",
+    "expected_status": "needs_clarification",
+    "expected_error_code": "AMBIGUOUS_QUERY",
+    "reason": "问题缺少具体业务或资料类型",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_03",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "CLARIFY",
+    "question": "办理这个业务需要几天时间？",
+    "expected_status": "needs_clarification",
+    "expected_error_code": "AMBIGUOUS_QUERY",
+    "reason": "问题指代不明",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_04",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "CLARIFY",
+    "question": "满足这个要求需要多少资本？",
+    "expected_status": "needs_clarification",
+    "expected_error_code": "AMBIGUOUS_QUERY",
+    "reason": "缺少适用场景与机构档位",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_05",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "CLARIFY",
+    "question": "这家机构的拨备覆盖率达标了吗？",
+    "expected_status": "needs_clarification",
+    "expected_error_code": "AMBIGUOUS_QUERY",
+    "reason": "缺少机构实际拨备覆盖率数值",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_06",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_EVIDENCE",
+    "question": "《消费金融公司管理办法》第九百九十九条规定了什么？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_EVIDENCE",
+    "reason": "法规中不存在该条款号",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_07",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_EVIDENCE",
+    "question": "2035年国家金融监督管理总局监管统计信息发布日程表是怎样的？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_EVIDENCE",
+    "reason": "未收录未来年份统计日程",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_08",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_EVIDENCE",
+    "question": "《商业银行资本管理办法》附件99关于量子计算资产计量的规定是什么？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_EVIDENCE",
+    "reason": "不存在该附件条款",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_09",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_EVIDENCE",
+    "question": "2024年二季度某特定未公开内部村镇银行的核心一级资本充足率具体数值是多少？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_EVIDENCE",
+    "reason": "知识库无非公开机构数据",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_10",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_EVIDENCE",
+    "question": "《商业银行大额风险暴露管理办法》第七十二条第二款的具体文字表述是什么？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_EVIDENCE",
+    "reason": "条款超出实际条文数量",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_11",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_OPERAND",
+    "question": "在《2023年4季度保险业资金运用情况表》中，不存在的指标A与不存在的指标B相差多少？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_OPERAND",
+    "reason": "表格中缺少两个指标的操作数值",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_12",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_OPERAND",
+    "question": "在《2023年4季度保险业资金运用情况表》中，火星投资项目占资金运用余额的比重是多少？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_OPERAND",
+    "reason": "表格中缺少火星投资项目操作数",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_13",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_OPERAND",
+    "question": "根据《2023年12月全国各地区原保险保费收入情况表》，元宇宙险减去合计保费为多少？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_OPERAND",
+    "reason": "表格中缺少元宇宙险操作数",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_14",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_OPERAND",
+    "question": "在《2024年商业银行主要监管指标情况表》中，量子信贷坏账率与不良贷款率差额是多少？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_OPERAND",
+    "reason": "表格中缺少量子信贷指标",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_15",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "MISSING_OPERAND",
+    "question": "在《2023年4季度保险业资金运用情况表》中，虚构资产C与银行存款谁的数值更高？",
+    "expected_status": "no_evidence",
+    "expected_error_code": "MISSING_OPERAND",
+    "reason": "表格中缺少虚构资产C候选值",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_16",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "OPTION_NOT_VERIFIED",
+    "question": "根据《消费金融公司管理办法》，以下哪项正确？\nA. 消费金融公司可以发行火星加密货币\nB. 消费金融公司可以经营星际航天保险",
+    "expected_status": "no_evidence",
+    "expected_error_code": "OPTION_NOT_VERIFIED",
+    "reason": "全部选项均无有效条款依据支持",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_17",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "OPTION_NOT_VERIFIED",
+    "question": "根据《商业银行资本管理办法》，以下哪项正确？\nA. 第三档商业银行必须设立反物质隔离资产池\nB. 商业银行核心一级资本可以由虚拟积分充抵",
+    "expected_status": "no_evidence",
+    "expected_error_code": "OPTION_NOT_VERIFIED",
+    "reason": "选项均为虚构断言",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_18",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "OPTION_NOT_VERIFIED",
+    "question": "根据《金融租赁公司管理办法》，以下哪两项正确？\nA. 金融租赁公司可以无抵押发行太空通证\nB. 金融租赁公司主要出资人必须是火星常住居民",
+    "expected_status": "no_evidence",
+    "expected_error_code": "INSUFFICIENT_OPTIONS",
+    "reason": "无足够正向支持选项",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_19",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "OPTION_NOT_VERIFIED",
+    "question": "根据《商业银行大额风险暴露管理办法》，以下哪项正确？\nA. 对外星系实体的风险暴露不受资本限制\nB. 银行可以向单一客户提供无限额贷款",
+    "expected_status": "no_evidence",
+    "expected_error_code": "OPTION_NOT_VERIFIED",
+    "reason": "选项缺乏法规支持",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  },
+  {
+    "id": "FAIL_20",
+    "category": "FAILURE_CASES",
+    "task_type": "FAILURE_CASE",
+    "failure_type": "OPTION_NOT_VERIFIED",
+    "question": "根据《商业银行理财业务监督管理办法》，以下哪项正确？\nA. 理财产品可以承诺保本保收益并兜底赔偿\nB. 理财托管机构可以由未经监管批准的海外空壳公司担任",
+    "expected_status": "no_evidence",
+    "expected_error_code": "OPTION_NOT_VERIFIED",
+    "reason": "选项存在否定矛盾或无依据",
+    "test_dimensions": [
+      "failure_diagnosis_accuracy",
+      "no_false_clarify",
+      "no_hallucination_answer"
+    ]
+  }
+]

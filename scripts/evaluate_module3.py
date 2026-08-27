@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+for path_str in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 from app.retrieval.hybrid_retriever import retrieve
 from app.schemas.chunk_schema import SearchResult

@@ -14,6 +14,9 @@ from app.shared.jsonl import read_jsonl
 
 
 from app.utils.paths import resolve_path
+from app.utils.logger import get_logger
+
+logger = get_logger("app.indexing.vector")
 
 EmbeddingBackend = Literal["sentence-transformers", "hashing"]
 
@@ -366,6 +369,9 @@ class VectorIndexSearcher:
             query_prefix=query_prefix,
             passage_prefix=passage_prefix,
         )
+        logger.info(
+            f"[VectorIndexSearcher] 成功加载 FAISS 索引: {self.index_path} (向量总数: {self.index.ntotal}, 维度: {self.index.d}, 后端: {backend})"
+        )
 
     def search(
         self,
@@ -413,6 +419,7 @@ class VectorIndexSearcher:
             )
             if len(hits) >= top_k:
                 break
+        logger.debug(f"[VectorIndexSearcher] 向量语义召回完成: 命中 {len(hits)} 条 (top_k={top_k})")
         return hits
 
 

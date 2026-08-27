@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from fastapi.testclient import TestClient
 
@@ -18,6 +25,29 @@ class Module3APITest(unittest.TestCase):
         self.assertEqual(response.json()["status"], "healthy")
         self.assertEqual(response.json()["service"], "RegTrust-RAG Engine")
         self.assertEqual(response.json()["pipeline"], "Module 1-4 Connected")
+
+    def test_stats_and_indexes_endpoints(self) -> None:
+        stats_resp = self.client.get("/api/v1/stats")
+        self.assertEqual(stats_resp.status_code, 200)
+        stats = stats_resp.json()
+        self.assertIn("chunk_count", stats)
+        self.assertIn("clause_chunk_count", stats)
+        self.assertIn("table_chunk_count", stats)
+        self.assertIn("embedding_dimension", stats)
+        self.assertEqual(stats["embedding_dimension"], 512)
+
+        indexes_resp = self.client.get("/api/v1/kb/indexes")
+        self.assertEqual(indexes_resp.status_code, 200)
+        idx_data = indexes_resp.json()
+        self.assertIn("summary", idx_data)
+        self.assertIn("files", idx_data)
+        self.assertEqual(idx_data["summary"]["embedding_dimension"], 512)
+
+        verify_resp = self.client.post("/api/v1/kb/indexes/verify")
+        self.assertEqual(verify_resp.status_code, 200)
+        verify_data = verify_resp.json()
+        self.assertTrue(verify_data["passed"])
+        self.assertEqual(verify_data["dimension"], 512)
 
     @patch("app.api.main.retrieve")
     def test_retrieve_endpoint_preserves_module3_contract(self, mocked_retrieve) -> None:

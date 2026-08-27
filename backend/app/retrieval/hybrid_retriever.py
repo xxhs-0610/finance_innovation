@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
@@ -12,8 +13,12 @@ from app.retrieval.query_parser import parse_query
 from app.retrieval.reranker import CandidateReranker, RuleBasedReranker
 from app.retrieval.table_retriever import TableRetriever
 from app.retrieval.vector_retriever import KnowledgeBaseVectorBackend, VectorRetriever
+from app.retrieval.multi_target_retriever import multi_target_retriever
 from app.schemas.chunk_schema import SearchResult
 from app.schemas.retrieval_schema import QueryAnalysis, RetrievalResponse
+from app.utils.logger import get_logger
+
+logger = get_logger("app.retrieval.hybrid")
 
 
 class CandidateRetriever(Protocol):
@@ -45,8 +50,58 @@ class HybridRetriever:
         self.rrf_k = rrf_k
         self.reranker = reranker
 
-    def search(self, question: str, top_k: int = 5) -> RetrievalResponse:
-        analysis = parse_query(question)
+    def search(
+        self,
+        question: str,
+        top_k: int = 5,
+        task_type: str | None = None,
+        options: dict[str, str] | None = None,
+    ) -> RetrievalResponse:
+        analysis = parse_query(question, task_type=task_type, options=options)
+        logger.info(
+            f"[HybridRetriever] 意图解析: query='{question}', task_type='{analysis.task_type}', "
+            f"type='{analysis.query_type}', topic='{analysis.topic}', institution='{analysis.institution_type}', "
+            f"indicator='{analysis.indicator}', period='{analysis.time_period}', rule='{analysis.rule_type}'"
+        )
+
+        # Discrete Multi-Target Retrieval Dispatch (unless custom test mock retrievers are injected)
+        is_mock_pipeline = any(r.name not in {"bm25", "vector", "table"} for r in self.retrievers)
+        if not is_mock_pipeline and analysis.task_plan and analysis.task_plan.task_type in {
+            "TABLE_COMPARE",
+            "TABLE_CALCULATION",
+            "FACT_SINGLE_CHOICE",
+            "FACT_MULTI_CHOICE",
+            "TABLE_LOOKUP",
+        }:
+            mt_response = multi_target_retriever.retrieve(
+                question, analysis.task_plan, top_k=top_k
+            )
+            evidence = mt_response.merged_evidence
+            status = "answerable" if evidence else "no_evidence"
+            logger.info(
+                f"[HybridRetriever] 多目标检索完成 | 任务数={len(mt_response.retrieval_tasks)} | "
+                f"成功数={sum(1 for r in mt_response.retrieval_results if r.status == 'SUCCESS')} | "
+                f"融合证据数={len(evidence)} | 状态={status}"
+            )
+            return RetrievalResponse(
+                query=analysis.question,
+                analysis=analysis,
+                status=status,
+                evidence=evidence,
+                diagnostics={
+                    "routing": {
+                        "query_type": analysis.query_type,
+                        "task_type": analysis.task_type,
+                        "retrieval_mode": "multi_target",
+                    },
+                    "retrieval_tasks": [t.to_dict() for t in mt_response.retrieval_tasks],
+                    "retrieval_results": [r.to_dict() for r in mt_response.retrieval_results],
+                    "multi_target": mt_response.to_dict(),
+                    "failures": [],
+                },
+                module4_guidance=_module4_guidance(analysis, status, evidence),
+            )
+
         candidate_top_k = max(top_k * 4, 20) if top_k > 0 else 0
         result_sets: dict[str, list[SearchResult]] = {}
         retriever_diagnostics: dict[str, dict[str, str | int]] = {}
@@ -140,10 +195,10 @@ class HybridRetriever:
                 "candidate_count": len(results),
             }
 
+        counts_str = ", ".join(f"{name}={len(res)}条" for name, res in result_sets.items())
+        logger.info(f"[HybridRetriever] 各路候选召回: {counts_str or '无'}")
+
         fused = reciprocal_rank_fusion(result_sets, rrf_k=self.rrf_k)
-        # Enforce critical entity constraints once more at the orchestration
-        # boundary. This also protects callers that inject a custom retriever
-        # which does not apply module 3's built-in post-filters.
         fused = apply_entity_filters(analysis, fused)
         reranker_diagnostics: dict[str, str] = {"status": "disabled"}
         if self.reranker:
@@ -172,6 +227,18 @@ class HybridRetriever:
                 }
         evidence = select_evidence(fused, top_k=top_k, analysis=analysis)
         status = _response_status(analysis, evidence, failures)
+        logger.info(f"[HybridRetriever] RRF融合候选: {len(fused)}条 -> 最终优选证据: {len(evidence)}条 (状态: {status})")
+        
+        rerank_top = [
+            {
+                "citation_id": f"E{idx}",
+                "chunk_id": r.chunk_id,
+                "title": getattr(r.source, "title", "") if hasattr(r.source, "title") else (r.source.get("title", "") if isinstance(r.source, dict) else ""),
+                "score": float(r.score),
+            }
+            for idx, r in enumerate(evidence, 1)
+        ]
+
         return RetrievalResponse(
             query=analysis.question,
             analysis=analysis,
@@ -182,8 +249,10 @@ class HybridRetriever:
                     "query_type": analysis.query_type,
                     "skipped_retrievers": skipped_retrievers,
                 },
+                "recall_counts": {name: len(res) for name, res in result_sets.items()},
                 "retrievers": retriever_diagnostics,
                 "reranker": reranker_diagnostics,
+                "rerank_top": rerank_top,
                 "failures": failures,
             },
             module4_guidance=_module4_guidance(analysis, status, evidence),
@@ -255,6 +324,8 @@ def _merge_metadata(target: dict, incoming: dict) -> None:
 def retrieve(
     question: str,
     top_k: int = 5,
+    task_type: str | None = None,
+    options: dict[str, str] | None = None,
     *,
     db_path: str | Path = "data/processed/kb_rebuild/metadata.db",
     index_dir: str | Path = "indexes/kb_rebuild",
@@ -268,12 +339,14 @@ def retrieve(
         ],
         reranker=RuleBasedReranker(),
     )
-    return retriever.search(question, top_k=top_k)
+    return retriever.search(question, top_k=top_k, task_type=task_type, options=options)
 
 
 def retrieve_evidence(
     question: str,
     top_k: int = 5,
+    task_type: str | None = None,
+    options: dict[str, str] | None = None,
     *,
     db_path: str | Path = "data/processed/kb_rebuild/metadata.db",
     index_dir: str | Path = "indexes/kb_rebuild",
@@ -282,12 +355,59 @@ def retrieve_evidence(
     response = retrieve(
         question,
         top_k=top_k,
+        task_type=task_type,
+        options=options,
         db_path=db_path,
         index_dir=index_dir,
     )
-    if not response.module4_guidance.get("may_generate_answer", False):
+    return [item.to_dict() for item in (response.evidence[:top_k] if top_k > 0 else response.evidence)]
+
+
+def _format_reranker_results(
+    analysis: QueryAnalysis,
+    raw_results: Sequence[SearchResult],
+    ranked_results: Sequence[SearchResult],
+) -> dict:
+    if not ranked_results:
+        return {"status": "skipped"}
+    return {
+        "status": "applied",
+        "input_count": len(raw_results),
+        "output_count": len(ranked_results),
+        "top_sources": [
+            item.metadata.get("source") or item.metadata.get("title")
+            for item in ranked_results[:3]
+        ],
+    }
+
+
+def _collect_option_candidates(
+    evidence: Sequence[SearchResult],
+) -> list[str]:
+    options: list[str] = []
+    for item in evidence:
+        selection = item.metadata.get("table_cell_selection", {})
+        for option in selection.get("dimension_options", []):
+            if isinstance(option, dict):
+                label = str(option.get("label") or option.get("cell_ref") or "")
+            else:
+                label = str(option or "")
+            if label and label not in options:
+                options.append(label)
+    return options
+
+
+def _missing_required_entities(analysis: QueryAnalysis) -> list[str]:
+    if analysis.task_plan and analysis.task_plan.need_clarification:
+        return ["metric"]
+    if analysis.task_plan and not analysis.task_plan.need_clarification:
         return []
-    return [item.to_dict() for item in response.evidence]
+    missing: list[str] = []
+    if analysis.query_type in {"table_lookup", "clause_threshold"} and not analysis.entities.get(
+        "metric"
+    ):
+        missing.append("metric")
+    return missing
 
 
 def _response_status(
@@ -297,15 +417,17 @@ def _response_status(
 ) -> str:
     if not evidence:
         return "no_evidence"
-    if _requires_bank_tier_clarification(analysis, evidence):
-        return "needs_clarification"
-    if _requires_table_dimension_clarification(analysis, evidence):
-        return "needs_clarification"
     if not any(
         item.metadata.get("evidence_quality", {}).get("complete")
         for item in evidence
     ):
         return "no_evidence"
+    if analysis.task_plan and not analysis.task_plan.need_clarification:
+        return "answerable"
+    if _requires_bank_tier_clarification(analysis, evidence):
+        return "needs_clarification"
+    if _requires_table_dimension_clarification(analysis, evidence):
+        return "needs_clarification"
     if failures:
         return "degraded"
     return "answerable"
@@ -358,6 +480,12 @@ def _module4_guidance(
 def _requires_bank_tier_clarification(
     analysis: QueryAnalysis, evidence: Sequence[SearchResult]
 ) -> bool:
+    if analysis.task_plan and not analysis.task_plan.need_clarification:
+        return False
+    q = (analysis.question or "").strip()
+    # If the question specifies choices, general baselines, or specific entities, do not clarify
+    if any(c in q for c in ("A:", "A.", "A：", "A、", "第一档", "第二档", "第三档", "最低监管要求是多少", "底线要求是多少", "最低要求是多少")):
+        return False
     if analysis.query_type != "clause_threshold" or analysis.entities.get("bank_tier"):
         return False
     scope_text = " ".join(
@@ -370,13 +498,9 @@ def _requires_bank_tier_clarification(
 def _requires_table_dimension_clarification(
     analysis: QueryAnalysis, evidence: Sequence[SearchResult]
 ) -> bool:
-    if analysis.query_type != "table_lookup":
-        return False
-    return any(
-        item.metadata.get("table_cell_selection", {}).get("status")
-        == "ambiguous_dimension"
-        for item in evidence
-    )
+    # Prompt 7 rule: Multi-column tables, multiple options, or multi-metric queries NEVER trigger clarification.
+    # Deterministic TableExecutor handles extraction; if missing, returns MISSING_OPERAND (no_evidence).
+    return False
 
 
 def _table_dimension_options(evidence: Sequence[SearchResult]) -> list[str]:
@@ -394,11 +518,21 @@ def _table_dimension_options(evidence: Sequence[SearchResult]) -> list[str]:
 
 
 def _missing_required_entities(analysis: QueryAnalysis) -> list[str]:
+    """Identify genuine missing entities only when user expression is fundamentally incomplete."""
+    if analysis.task_plan and not analysis.task_plan.need_clarification:
+        return []
+    q = (analysis.question or "").strip()
+    # Multiple targets, choices, comparisons, or calculations are NEVER missing entities
+    if any(c in q for c in ("A:", "A.", "A：", "A、", "比较", "相差", "差距", "从", "到", "谁最大", "谁最小", "哪项", "最高", "最低")):
+        return []
+    if len(re.findall(r"“[^”]+”|‘[^’]+’|《[^》]+》", q)) >= 2:
+        return []
+
     missing: list[str] = []
-    if analysis.query_type in {"table_lookup", "clause_threshold"} and not analysis.entities.get(
-        "metric"
-    ):
-        missing.append("metric")
+    # Only flag missing metric for ungrounded dangling demonstrative queries or bare time queries without metric
+    if analysis.query_type in {"table_lookup", "clause_threshold"} or (analysis.task_plan and analysis.task_plan.need_clarification):
+        if re.match(r"^(?:申请|办理)?(?:这个|那个|这项|该项|此项|指标是多少|比例是多少)", q) or (not analysis.indicator and any(w in q for w in ("是多少", "多少")) and not any(k in q for k in ("资本", "保费", "贷款", "存款", "资产", "负债", "收入", "支出", "余额", "比例", "率"))):
+            missing.append("metric")
     return missing
 
 

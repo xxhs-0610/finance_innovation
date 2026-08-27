@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sys
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from app.api.main import ask
 from app.generation.answer_generator import generate_answer
@@ -366,7 +372,7 @@ class Module4GenerationTest(unittest.TestCase):
         ) as mocked_enabled:
             result = ask("2025年三季度是多少？")
 
-        mocked_retrieve.assert_called_once_with("2025年三季度是多少？")
+        self.assertEqual(mocked_retrieve.call_args[0][0], "2025年三季度是多少？")
         mocked_enabled.assert_called_once_with()
         self.assertEqual(result["status"], "needs_clarification")
         self.assertEqual(result["answer"], "请补充具体指标。")

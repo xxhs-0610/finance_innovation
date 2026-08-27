@@ -260,15 +260,22 @@ class AppState {
         { id: 'PDF-2024-002', title: '银行业保险业绿色金融指引.pdf', type: 'PDF', chunks: 64, docNo: '银保监发〔2022〕15号', category: '绿色金融', updated: '2026-08-08', status: '已就绪' }
       ],
 
-      // Pipeline Metrics
+      // Pipeline & Indexes Metrics
       pipelineStats: {
-        rawFiles: 218,
-        totalChunks: 4892,
-        vectorDim: 768,
+        rawFiles: 492,
+        totalDocs: 500,
+        totalChunks: 125166,
+        clauseChunks: 22880,
+        tableChunks: 102286,
+        vectorDim: 512,
+        vectorModel: 'Model/bge-small-zh-v1.5',
+        indexesDir: 'indexes/kb_rebuild',
+        totalStorage: '563.1 MB',
         seedQAPassing: '42 / 42 (100%)',
-        avgLatencyRetrieval: '64 ms',
-        avgLatencyGen: '360 ms'
-      }
+        avgLatencyRetrieval: '48 ms',
+        avgLatencyGen: '320 ms'
+      },
+      indexesOverview: null
     };
   }
 

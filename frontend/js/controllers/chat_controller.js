@@ -292,16 +292,79 @@ class ChatController {
     }
 
     const v = msg.verification;
+    const r = v.router || {};
+    const a = v.analyzer || {};
+    const ev = v.evidenceVerifier || {};
+
+    let routerHtml = '';
+    if (r.intent) {
+      routerHtml = `
+        <div style="background:var(--bg-subtle); border-radius:var(--radius-sm); padding:8px 10px; font-size:11.5px; display:flex; flex-direction:column; gap:4px;">
+          <div style="font-weight:600; color:var(--text-primary); border-bottom:1px solid var(--border-subtle); padding-bottom:3px; margin-bottom:2px; display:flex; justify-content:space-between;">
+            <span>🧭 Question Router</span>
+            <span class="badge badge-indigo" style="font-size:10px;">${r.intent}</span>
+          </div>
+          ${r.qa_type ? `<div style="display:flex; justify-content:space-between;"><span>业务细分:</span> <strong style="color:var(--brand-600);">${r.qa_type}</strong></div>` : ''}
+          ${r.reason ? `<div style="color:var(--text-secondary); font-size:11px; margin-top:2px;">${r.reason}</div>` : ''}
+        </div>
+      `;
+    }
+
+    let analyzerHtml = '';
+    if (a.topic || a.institution_type || a.indicator || a.rule_type) {
+      analyzerHtml = `
+        <div style="background:var(--bg-subtle); border-radius:var(--radius-sm); padding:8px 10px; font-size:11.5px; display:flex; flex-direction:column; gap:4px;">
+          <div style="font-weight:600; color:var(--text-primary); border-bottom:1px solid var(--border-subtle); padding-bottom:3px; margin-bottom:2px; display:flex; justify-content:space-between;">
+            <span>🔍 Query Analyzer</span>
+            <span style="font-size:10.5px; color:var(--text-muted);">${a.topic || '通用'}</span>
+          </div>
+          ${a.institution_type ? `<div style="display:flex; justify-content:space-between;"><span>适用机构:</span> <strong>${a.institution_type}</strong></div>` : ''}
+          ${a.indicator ? `<div style="display:flex; justify-content:space-between;"><span>监管指标:</span> <strong style="color:var(--brand-600);">${a.indicator}</strong></div>` : ''}
+          ${a.time_period ? `<div style="display:flex; justify-content:space-between;"><span>统计期间:</span> <strong>${a.time_period}</strong></div>` : ''}
+          ${a.rule_type ? `<div style="display:flex; justify-content:space-between;"><span>规则类型:</span> <strong>${a.rule_type}</strong></div>` : ''}
+          ${a.keywords && a.keywords.length > 0 ? `
+            <div style="margin-top:2px; display:flex; gap:4px; flex-wrap:wrap;">
+              ${a.keywords.map(k => `<span style="background:var(--bg-app); border:1px solid var(--border-subtle); border-radius:4px; padding:1px 5px; font-size:10px; color:var(--text-secondary);">${k}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    let verifierHtml = '';
+    if (ev.reason_code) {
+      const isOk = ev.reason_code === 'SUFFICIENT';
+      const badgeColor = isOk ? 'badge-success' : (ev.need_clarification ? 'badge-warning' : 'badge-danger');
+      verifierHtml = `
+        <div style="background:var(--bg-subtle); border-radius:var(--radius-sm); padding:8px 10px; font-size:11.5px; display:flex; flex-direction:column; gap:4px;">
+          <div style="font-weight:600; color:var(--text-primary); border-bottom:1px solid var(--border-subtle); padding-bottom:3px; margin-bottom:2px; display:flex; justify-content:space-between;">
+            <span>🛡️ Evidence Verifier</span>
+            <span class="badge ${badgeColor}" style="font-size:10px;">${ev.reason_code}</span>
+          </div>
+          <div style="color:var(--text-secondary); font-size:11px; line-height:1.4;">${ev.reason || ''}</div>
+          ${ev.missing_information && ev.missing_information.length > 0 ? `
+            <div style="color:#b45309; font-size:10.5px; margin-top:2px;">⚠️ 缺失要素: ${ev.missing_information.join('；')}</div>
+          ` : ''}
+        </div>
+      `;
+    }
+
     el.innerHTML = `
       <div class="right-stat-grid">
-        <div class="right-stat-item"><div class="right-stat-label">意图分类</div><div class="right-stat-value" style="font-size:12.5px; font-weight:600; color:var(--brand-600);">${v.intent}</div></div>
+        <div class="right-stat-item"><div class="right-stat-label">意图分类</div><div class="right-stat-value" style="font-size:12px; font-weight:600; color:var(--brand-600);">${r.intent || v.intent}</div></div>
         <div class="right-stat-item"><div class="right-stat-label">综合置信度</div><div class="right-stat-value" style="color:var(--success-text);">${v.confidence}%</div></div>
-        <div class="right-stat-item"><div class="right-stat-label">检索耗时</div><div class="right-stat-value" style="font-size:13px;">${v.retrievalLatency}</div></div>
-        <div class="right-stat-item"><div class="right-stat-label">生成耗时</div><div class="right-stat-value" style="font-size:13px;">${v.genLatency}</div></div>
+        <div class="right-stat-item"><div class="right-stat-label">检索耗时</div><div class="right-stat-value" style="font-size:12.5px;">${v.retrievalLatency}</div></div>
+        <div class="right-stat-item"><div class="right-stat-label">生成耗时</div><div class="right-stat-value" style="font-size:12.5px;">${v.genLatency}</div></div>
       </div>
-      <div style="background:var(--bg-subtle); border-radius:var(--radius-sm); padding:8px 10px; font-size:11.5px; display:flex; flex-direction:column; gap:4px;">
-        <div style="display:flex; justify-content:space-between;"><span>数字合规校验:</span> <strong style="color:var(--success-text);">${v.numCheck}</strong></div>
-        <div style="display:flex; justify-content:space-between;"><span>幻觉阻断状态:</span> <strong style="color:var(--success-text);">${v.hallucinationCheck}</strong></div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+        ${routerHtml}
+        ${analyzerHtml}
+        ${verifierHtml}
+        <div style="background:var(--bg-subtle); border-radius:var(--radius-sm); padding:8px 10px; font-size:11.5px; display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; justify-content:space-between;"><span>数字合规校验:</span> <strong style="color:var(--success-text);">${v.numCheck}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span>幻觉阻断状态:</span> <strong style="color:var(--success-text);">${v.hallucinationCheck}</strong></div>
+          ${v.totalLatency ? `<div style="display:flex; justify-content:space-between;"><span>全链路总耗时:</span> <strong>${v.totalLatency}</strong></div>` : ''}
+        </div>
       </div>
     `;
   }

@@ -13,6 +13,9 @@ from app.schemas.chunk_schema import SearchResult, SourceInfo
 
 
 from app.utils.paths import resolve_path
+from app.utils.logger import get_logger
+
+logger = get_logger("app.indexing.reader")
 
 
 def _resolve_default_db_path(requested: str | Path) -> Path:

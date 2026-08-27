@@ -16,3 +16,7 @@ data/parsed/tables/table_evidence.jsonl
 Model/bge-small-zh-v1.5/model.safetensors
 Model/bge-small-zh-v1.5/pytorch_model.bin
 Model/bge-small-zh-v1.5/.cache/
+
+logs/
+*.log
+

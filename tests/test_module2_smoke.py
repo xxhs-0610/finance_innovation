@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+for p in [str(PROJECT_ROOT), str(PROJECT_ROOT / "backend")]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 from app.indexing.build_kb import build_kb
 from app.indexing.index_reader import KnowledgeBaseReader

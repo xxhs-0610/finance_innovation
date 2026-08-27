@@ -23,7 +23,7 @@
           <span>RegTrust-RAG</span>
         </div>
         <span class="badge badge-indigo">银行监管与统计报表可信问答</span>
-        <span class="badge badge-success">● 知识库已就绪 (4,892 Chunks)</span>
+        <span class="badge badge-success" id="topbarKbBadge">● 知识库与双路索引已就绪 (125,166 Chunks)</span>
       </div>
 
       <div class="topbar-right">
@@ -121,7 +121,7 @@
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="badge">混合检索 (BM25 + FAISS)</span>
+            <span class="badge">混合检索 (BM25 + 512维 FAISS)</span>
             <span class="badge badge-success">✓ 数字与幻觉校验开启</span>
           </div>
         </div>
@@ -256,6 +256,69 @@
 
           <!-- VIEW 3: 知识库管理 (KB Management - Admin Only) -->
           <section class="view-panel" id="view-kb">
+            <!-- Index Status Overview Dashboard -->
+            <div class="kb-index-dashboard" id="kbIndexDashboard">
+              <div class="kb-index-card">
+                <div class="kb-index-card-header">
+                  <div class="kb-index-card-title">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    <span>FAISS 密集向量索引</span>
+                  </div>
+                  <span class="badge badge-success" id="badgeFaissDim">512 维</span>
+                </div>
+                <div class="kb-index-card-value" id="idxFaissCount">125,166</div>
+                <div class="kb-index-card-sub">
+                  <span>文件: <code>faiss.index</code> (244.5 MB)</span><br/>
+                  <span>度量: Cosine 归一化内积</span>
+                </div>
+              </div>
+
+              <div class="kb-index-card">
+                <div class="kb-index-card-header">
+                  <div class="kb-index-card-title">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    <span>BM25 倒排文本语料</span>
+                  </div>
+                  <span class="badge badge-indigo">FTS5</span>
+                </div>
+                <div class="kb-index-card-value" id="idxBm25Count">125,166</div>
+                <div class="kb-index-card-sub">
+                  <span>语料: <code>bm25_corpus.jsonl</code> (60.4 MB)</span><br/>
+                  <span>支持条款文号与关键词秒级召回</span>
+                </div>
+              </div>
+
+              <div class="kb-index-card">
+                <div class="kb-index-card-header">
+                  <div class="kb-index-card-title">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    <span>切片结构与构成</span>
+                  </div>
+                  <span class="badge badge-info">500 篇文档</span>
+                </div>
+                <div class="kb-index-card-value" id="idxChunksBreakdown">22,880 + 102,286</div>
+                <div class="kb-index-card-sub">
+                  <span>制度条款: <strong>22,880</strong> | 报表: <strong>102,286</strong></span><br/>
+                  <span>映射表: <code>chunk_id_map.json</code> (13.7 MB)</span>
+                </div>
+              </div>
+
+              <div class="kb-index-card">
+                <div class="kb-index-card-header">
+                  <div class="kb-index-card-title">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>向量模型与存储</span>
+                  </div>
+                  <span class="badge badge-success" id="badgeIndexHealth">✓ 索引已就绪</span>
+                </div>
+                <div class="kb-index-card-value" id="idxStorageTotal">563.1 MB</div>
+                <div class="kb-index-card-sub">
+                  <span>模型: <code>Model/bge-small-zh-v1.5</code></span><br/>
+                  <span>目录: <code>indexes/kb_rebuild/</code></span>
+                </div>
+              </div>
+            </div>
+
             <div class="kb-table-container">
               <div class="kb-filter-bar">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -265,7 +328,7 @@
                 <div style="display:flex; gap:8px;">
                   <button class="btn btn-sm btn-primary" id="rebuildIndexBtn">
                     <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
-                    重建全量向量与倒排索引
+                    检测与校验全量双路索引
                   </button>
                 </div>
               </div>
@@ -348,7 +411,7 @@
                 <div class="flow-step-card" data-step="3" style="cursor:pointer;">
                   <span class="flow-step-num">步骤 3</span>
                   <div class="flow-step-title">知识构建 (KB)</div>
-                  <div class="flow-step-desc">构建 FAISS 向量索引与 BM25 倒排索引。</div>
+                  <div class="flow-step-desc">构建 FAISS (512维) 与 BM25 双路索引 (125,166 Chunks)。</div>
                 </div>
 
                 <div class="flow-step-card" data-step="4" style="cursor:pointer;">
@@ -380,13 +443,14 @@
 
                 <div class="pipeline-module-card">
                   <div class="pipeline-module-title">
-                    <span>模块 2-3：知识库与混合检索</span>
+                    <span>模块 2-3：知识库与双路检索</span>
                     <span class="badge badge-success">✓ 运行正常</span>
                   </div>
                   <div class="pipeline-item-list">
-                    <div>• 倒排索引: BM25 (精准条款文号召回)</div>
-                    <div>• 向量索引: FAISS (768维语义嵌入召回)</div>
-                    <div>• 精重排: BGE-Reranker (Top 3~5 证据包)</div>
+                    <div>• 倒排语料: BM25 (125,166 记录 · 60.4MB)</div>
+                    <div>• 向量索引: FAISS (512维 bge-small · 125,166 向量)</div>
+                    <div>• 索引产物: <code>indexes/kb_rebuild/</code> (563.1MB)</div>
+                    <div>• 精重排: BGE-Reranker + RRF 融合 (Top 3~5 证据包)</div>
                   </div>
                 </div>
 
@@ -427,15 +491,15 @@
             <span class="badge badge-success">就绪</span>
           </div>
           <div class="right-stat-grid">
-            <div class="right-stat-item"><div class="right-stat-label">原始文件 (raw)</div><div class="right-stat-value">218 份</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">原始文件 (raw)</div><div class="right-stat-value">500 份</div></div>
             <div class="right-stat-item"><div class="right-stat-label">结构化解析</div><div class="right-stat-value">100%</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">总切片 Chunks</div><div class="right-stat-value">4,892</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">总切片 Chunks</div><div class="right-stat-value">125,166</div></div>
             <div class="right-stat-item"><div class="right-stat-label">解析吞吐率</div><div class="right-stat-value">45 页/秒</div></div>
           </div>
           <div style="font-size:11.5px; color:var(--text-muted); line-height:1.5;">
             统一落库路径规范：<br/>
             • <code>data/raw/nfra_page_attachments_500/</code><br/>
-            • <code>data/parsed/docs/</code> & <code>tables/</code>
+            • <code>data/processed/kb_rebuild/</code> & <code>indexes/</code>
           </div>
         </div>
 
@@ -453,14 +517,14 @@
         <!-- Knowledge Base Context Widget -->
         <div class="right-card right-view-panel hidden" data-for-view="kb">
           <div class="right-card-title">
-            <span>知识库健康度</span>
+            <span>知识库与索引健康度</span>
             <span class="badge badge-success">正常</span>
           </div>
           <div class="right-stat-grid">
-            <div class="right-stat-item"><div class="right-stat-label">制度类 (Word/PDF)</div><div class="right-stat-value">150 篇</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">统计报表 (Excel)</div><div class="right-stat-value">68 张</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">向量维度</div><div class="right-stat-value">768 维</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">索引覆盖率</div><div class="right-stat-value">100%</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">制度/报表文档</div><div class="right-stat-value">500 篇</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">切片总数</div><div class="right-stat-value">125,166</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">向量维度</div><div class="right-stat-value">512 维</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">索引总规模</div><div class="right-stat-value">563.1 MB</div></div>
           </div>
         </div>
 
@@ -473,8 +537,8 @@
           <div class="right-stat-grid">
             <div class="right-stat-item"><div class="right-stat-label">种子问答通过率</div><div class="right-stat-value" style="color:var(--success-text);">100%</div></div>
             <div class="right-stat-item"><div class="right-stat-label">Top-3 证据召回率</div><div class="right-stat-value">94.2%</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">平均检索耗时</div><div class="right-stat-value">64 ms</div></div>
-            <div class="right-stat-item"><div class="right-stat-label">生成耗时</div><div class="right-stat-value">360 ms</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">平均检索耗时</div><div class="right-stat-value">48 ms</div></div>
+            <div class="right-stat-item"><div class="right-stat-label">生成耗时</div><div class="right-stat-value">320 ms</div></div>
           </div>
         </div>
 
@@ -485,7 +549,9 @@
             <span class="badge">v2.1</span>
           </div>
           <div style="font-size:11.5px; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
-            <div>• <strong>架构模型</strong>: 混合检索 (BM25 + FAISS)</div>
+            <div>• <strong>检索模型</strong>: 混合检索 (BM25 + 512维 FAISS)</div>
+            <div>• <strong>索引目录</strong>: <code>indexes/kb_rebuild/</code> (125,166 Chunks)</div>
+            <div>• <strong>嵌入模型</strong>: <code>Model/bge-small-zh-v1.5</code></div>
             <div>• <strong>防幻觉机制</strong>: 结构化事实约束与事后比对</div>
             <div>• <strong>拒答机制</strong>: 库外及低置信度 (<0.7) 自动拒答</div>
             <div>• <strong>权限模式</strong>: RBAC 双角色动态分权</div>

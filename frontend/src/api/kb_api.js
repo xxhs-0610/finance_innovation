@@ -1,5 +1,6 @@
 /**
  * Knowledge Base API Endpoints
+ * Includes statistics, document retrieval, and deep index diagnostics
  */
 
 import { httpClient } from './http_client.js';
@@ -7,6 +8,14 @@ import { httpClient } from './http_client.js';
 export const KbApi = {
   getStats() {
     return httpClient.get('/api/v1/stats');
+  },
+
+  getIndexesStatus() {
+    return httpClient.get('/api/v1/kb/indexes');
+  },
+
+  verifyIndexes() {
+    return httpClient.post('/api/v1/kb/indexes/verify');
   },
 
   getDocuments(limit = 500, search = '') {
