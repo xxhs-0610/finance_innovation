@@ -1,32 +1,59 @@
+# -------------------------------------------------------------
+# 1. 临时/备份文件
+# -------------------------------------------------------------
 .git-local-backups/
-$null
+*.log                # 捕获项目根目录或子目录里的日志文件
+logs/                # 若有专门的 logs 目录
 
+# -------------------------------------------------------------
+# 2. Python 相关
+# -------------------------------------------------------------
 __pycache__/
-*.py[cod]
+*.py[cod]            # .pyc、.pyo、.pyd 等
 *.pyo
 
+# -------------------------------------------------------------
+# 3. 数据/模型 大文件（不需要提交）
+# -------------------------------------------------------------
+# 原始数据
 data/raw/
-数据集和QA/
+# 中文目录（若想递归忽略其所有内容）
+数据集和QA/**
 
+# 处理后的 KB 数据
 data/processed/kb_full_validation/
 data/processed/kb_rebuild/
+
+# 解析后的表格证据（JSONL 为文本，但已在基准集里，可根据需求保留或忽略）
 data/parsed/tables/parsed_tables.jsonl
 data/parsed/tables/table_evidence.jsonl
 
+# 大模型权重（已在项目中不需要提交）
 Model/bge-small-zh-v1.5/model.safetensors
 Model/bge-small-zh-v1.5/pytorch_model.bin
 Model/bge-small-zh-v1.5/.cache/
 
-<<<<<<< HEAD
-logs/
-*.log
-
-=======
-# Local secrets and installed frontend dependencies
-frontend/node_modules/
-**/node_modules/
-
-# Environment variables (contains real API keys — never commit)
-.env
->>>>>>> bf680b9d6881c682d5c0b0a3dc42cfa36a310898
+# -------------------------------------------------------------
+# 4. 索引文件（已决定不提交）
+# -------------------------------------------------------------
 indexes/
+
+# -------------------------------------------------------------
+# 5. 前端依赖 / 环境变量
+# -------------------------------------------------------------
+# Node.js 依赖（在任意子目录都会出现的 node_modules）
+**/node_modules/
+frontend/node_modules/        # 可保留作显式说明
+
+# 环境变量文件（包含真实 API Key，绝不要提交）
+.env
+.env*                        # 若有 .env.development、.env.production 等
+
+# -------------------------------------------------------------
+# 6. 其它需要忽略的临时文件（可自行添加）
+# -------------------------------------------------------------
+# 例：IDE 缓存、临时编辑文件等
+.vscode/
+.idea/
+*.swp
+.DS_Store
