@@ -102,6 +102,7 @@ class TaskPlanner:
         question: str,
         task_type: str | Any | None = None,
         options: dict[str, str] | None = None,
+        semantic_hint: dict[str, Any] | None = None,
     ) -> TaskPlan:
         """Analyze user query and decompose into an actionable TaskPlan."""
         raw = (question or "").strip()
@@ -115,6 +116,15 @@ class TaskPlanner:
             effective_task_type = task_type
 
         norm_task_type = self._normalize_task_type(effective_task_type or self._detect_task_type(stem, effective_opts))
+
+        if self._is_numeric_table_lookup(raw, effective_opts):
+            norm_task_type = "TABLE_LOOKUP"
+
+        # A question that names an Excel/report source and asks for one value is
+        # a table lookup even when it is presented with A-D numeric answers.
+        # The options are answer candidates, not independent retrieval targets.
+        if self._is_numeric_table_lookup(raw, effective_opts):
+            norm_task_type = "TABLE_LOOKUP"
 
         # 2. Extract common entities (Strictly without hallucination)
         doc_match = DOCUMENT_RE.search(raw)
@@ -146,12 +156,44 @@ class TaskPlanner:
         else:
             plan = self._plan_direct_fact_qa(stem, raw, file_name)
 
+        # Apply DeepSeek's explicit entities only when the deterministic parser
+        # did not already find them. This keeps the model as a semantic aid,
+        # never as an authority that can invent source facts.
+        if semantic_hint and isinstance(semantic_hint, dict):
+            if plan.source and not plan.source.file_name and semantic_hint.get("document_name"):
+                plan.source.file_name = str(semantic_hint["document_name"]).strip()
+            if plan.source and not plan.source.sheet_name and semantic_hint.get("sheet_name"):
+                plan.source.sheet_name = str(semantic_hint["sheet_name"]).strip()
+            if not plan.scope and semantic_hint.get("scope"):
+                plan.scope = str(semantic_hint["scope"]).strip()
+            if plan.task_type == "TABLE_LOOKUP" and semantic_hint.get("indicator"):
+                indicator = str(semantic_hint["indicator"]).strip()
+                if plan.targets:
+                    target = plan.targets[0]
+                    if not target.indicator or target.indicator == (plan.source.file_name if plan.source else ""):
+                        target.indicator = indicator
+                    if not target.row or target.row == "合计":
+                        target.row = indicator
+
         plan.question = raw
         logger.info(
             f"[TaskPlanner] 生成执行计划 | task_type={plan.task_type} | "
             f"source={plan.source.to_dict() if plan.source else (plan.source_constraints.to_dict() if plan.source_constraints else None)}"
         )
         return plan
+
+    def _is_numeric_table_lookup(self, question: str, options: dict[str, str]) -> bool:
+        if len(options) < 2:
+            return False
+        has_table_source = any(
+            marker in question
+            for marker in ("Excel", "工作表", "报表", "统计表", "情况表", "本年累计", "截至当期", "口径")
+        )
+        asks_for_value = any(marker in question for marker in ("是多少", "多少", "数值"))
+        numeric_option_re = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?\s*(?:%|亿元|万元|元|万件|件)?\s*$")
+        return has_table_source and asks_for_value and all(
+            numeric_option_re.fullmatch(str(value or "")) for value in options.values()
+        )
 
     def _normalize_task_type(self, task_type: str) -> str:
         """Map legacy or alternative aliases to 6 core task types."""
@@ -429,7 +471,10 @@ class TaskPlanner:
         file_name: str | None,
         options: dict[str, str],
     ) -> TaskPlan:
-        count = 2
+        # A question asking for “which option group contains two statements”
+        # expects one answer label (the group), while ordinary multi-fact
+        # questions may request multiple answer labels.
+        count = 1 if ("哪一组" in stem or "哪一组选项" in stem) else 2
         if "三项" in stem or "三组" in stem:
             count = 3
         elif "四项" in stem:

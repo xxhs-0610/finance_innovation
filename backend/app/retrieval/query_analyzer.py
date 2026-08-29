@@ -183,10 +183,12 @@ class QueryAnalyzer:
         question: str,
         task_type: str | None = None,
         options: dict[str, str] | None = None,
+        semantic_hint: dict[str, Any] | None = None,
     ) -> QueryAnalysis:
         """Parse user query into structured QueryAnalysis and TaskPlan without false assumptions."""
         raw = (question or "").strip()
         normalized = " ".join(raw.split())
+        semantic = semantic_hint if isinstance(semantic_hint, dict) else {}
         query_type = classify_query(normalized)
 
         # 0. Generate Execution Plan via TaskPlanner
@@ -194,6 +196,7 @@ class QueryAnalyzer:
             question=normalized,
             task_type=task_type,
             options=options,
+            semantic_hint=semantic,
         )
 
         entities: dict[str, str] = {}
@@ -213,6 +216,10 @@ class QueryAnalyzer:
                 document_name = "商业银行资本管理办法"
 
         if document_name:
+            entities["document"] = document_name
+            filters["title"] = document_name
+        elif semantic.get("document_name"):
+            document_name = str(semantic["document_name"]).strip()
             entities["document"] = document_name
             filters["title"] = document_name
 
@@ -251,6 +258,9 @@ class QueryAnalyzer:
                 indicator = m
                 entities["metric"] = m
                 break
+        if not indicator and semantic.get("indicator"):
+            indicator = str(semantic["indicator"]).strip()
+            entities["metric"] = indicator
 
         # 5. Article Number (Strict: only if explicitly present)
         article_number: str | None = None
@@ -285,6 +295,9 @@ class QueryAnalyzer:
             year_match = YEAR_RE.search(period_match.group(0))
             if year_match:
                 filters["publish_date"] = re.sub(r"\D", "", year_match.group(0))
+        if not time_period and semantic.get("time_period"):
+            time_period = str(semantic["time_period"]).strip()
+            entities["period"] = time_period
 
         # Operators & Values
         val_match = VALUE_RE.search(normalized)
@@ -331,6 +344,17 @@ class QueryAnalyzer:
             time_period=time_period,
             rule_type=rule_type,
         )
+        semantic_scope = str(semantic.get("scope") or "").strip()
+        if semantic_scope and semantic_scope not in keywords:
+            keywords.append(semantic_scope)
+        for value in semantic.get("keywords") or []:
+            value = str(value).strip()
+            if value and value not in keywords:
+                keywords.append(value)
+        if semantic.get("sheet_name"):
+            entities["sheet_name"] = str(semantic["sheet_name"]).strip()
+            if entities["sheet_name"] and entities["sheet_name"] not in keywords:
+                keywords.append(entities["sheet_name"])
 
         analysis = QueryAnalysis(
             question=normalized,

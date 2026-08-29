@@ -25,11 +25,20 @@ logger = get_logger("app.services.rag")
 class RAGService:
     """Core RAG pipeline service orchestrator with pre-retrieval Question Router."""
 
-    def retrieve(self, question: str, top_k: int = 5, task_type: str | None = None):
+    def retrieve(
+        self,
+        question: str,
+        top_k: int = 5,
+        task_type: str | None = None,
+        semantic_hint: dict[str, Any] | None = None,
+    ):
         """Execute Module 3 hybrid retrieval."""
         logger.info(f"[RAG] 启动模块3检索: query='{question}', top_k={top_k}, task_type={task_type}")
         t0 = time.perf_counter()
-        res = retrieve(question, top_k=top_k, task_type=task_type)
+        res = retrieve(
+            question, top_k=top_k, task_type=task_type,
+            semantic_hint=semantic_hint,
+        )
         elapsed_ms = (time.perf_counter() - t0) * 1000
         ev_count = len(res.evidence) if hasattr(res, "evidence") else 0
         status = getattr(res, "status", "unknown")
@@ -88,13 +97,22 @@ class RAGService:
         # -------------------------------------------------------------------------
         t0 = time.perf_counter()
         retrieve_call = retriever_fn or self.retrieve
+        semantic_hint = getattr(decision, "semantic", None)
         try:
-            retrieval_response = retrieve_call(q, top_k=top_k, task_type=decision.task_type)
+            retrieval_response = retrieve_call(
+                q, top_k=top_k, task_type=decision.task_type,
+                semantic_hint=semantic_hint,
+            )
         except TypeError:
+            # Preserve compatibility with test/custom retrievers that expose
+            # the older three-argument signature.
             try:
-                retrieval_response = retrieve_call(q, top_k=top_k)
+                retrieval_response = retrieve_call(q, top_k=top_k, task_type=decision.task_type)
             except TypeError:
-                retrieval_response = retrieve_call(q)
+                try:
+                    retrieval_response = retrieve_call(q, top_k=top_k)
+                except TypeError:
+                    retrieval_response = retrieve_call(q)
         t1 = time.perf_counter()
 
         is_enabled = (deepseek_enabled_fn or deepseek_enabled)()
@@ -256,12 +274,15 @@ class RAGService:
 
         evidence_list = getattr(retrieval_response, "evidence", []) if retrieval_response else []
         top_k = len(evidence_list)
-        sources = list(dict.fromkeys([
-            getattr(e.source, "title", "") if hasattr(e, "source") and hasattr(e.source, "title") else
-            (e.get("source", {}).get("title", "") if isinstance(e, dict) else "")
-            for e in evidence_list
-            if (hasattr(e, "source") and getattr(e.source, "title", "")) or (isinstance(e, dict) and e.get("source", {}).get("title"))
-        ]))
+        def _display_source_title(e: Any) -> str:
+            src = e.source if hasattr(e, "source") else (e.get("source", {}) if isinstance(e, dict) else {})
+            title = getattr(src, "title", "") if not isinstance(src, dict) else src.get("title", "")
+            path = getattr(src, "local_path", "") if not isinstance(src, dict) else src.get("local_path", "")
+            metadata = getattr(e, "metadata", {}) if not isinstance(e, dict) else e.get("metadata", {})
+            full_title = metadata.get("attachment_title") or metadata.get("source_page_title") or metadata.get("file_name") if isinstance(metadata, dict) else ""
+            return str(full_title or title or (path.replace("\\", "/").rsplit("/", 1)[-1] if path else "监管文件"))
+
+        sources = list(dict.fromkeys([_display_source_title(e) for e in evidence_list if _display_source_title(e)]))
 
         # Rerank results
         rerank_results = ret_diag.get("rerank_top", [])
@@ -270,7 +291,7 @@ class RAGService:
                 {
                     "citation_id": f"E{idx}",
                     "chunk_id": getattr(e, "chunk_id", e.get("chunk_id", "") if isinstance(e, dict) else ""),
-                    "title": getattr(e.source, "title", "") if hasattr(e, "source") and hasattr(e.source, "title") else (e.get("source", {}).get("title", "") if isinstance(e, dict) else ""),
+                    "title": _display_source_title(e),
                     "score": float(getattr(e, "score", e.get("score", 0.0) if isinstance(e, dict) else 0.0)),
                 }
                 for idx, e in enumerate(evidence_list, 1)

@@ -35,6 +35,152 @@ from app.utils.paths import resolve_path
 logger = get_logger("app.retrieval.multi_target")
 
 
+def _normalize_document_name(value: str | None) -> str | None:
+    """Remove common file-format suffixes before applying title filters."""
+    if not value:
+        return value
+    name = str(value).strip()
+    name = re.sub(r"\s*[（(]\s*(?:PDF|DOCX?|XLSX?)\s*[）)]\s*", "", name, flags=re.I)
+    name = re.sub(r"\.(?:pdf|docx?|xlsx?)$", "", name, flags=re.I)
+    return name.strip() or None
+
+
+def _canonical_title(value: str | None) -> str:
+    """Canonicalize title variants for matching user labels to KB titles."""
+    if not value:
+        return ""
+    name = _normalize_document_name(value) or ""
+    name = re.sub(r"[\s\u3000\-_—]+", "", name)
+    name = name.replace("（", "(").replace("）", ")")
+    # Year may appear at either end: 2023年Foo（季度） vs Foo(季度)(2023年)
+    years = re.findall(r"(?:19|20)\d{2}年", name)
+    name = re.sub(r"(?:19|20)\d{2}年", "", name)
+    name = name.replace("(", "").replace(")", "")
+    return name + "".join(years)
+
+
+def _document_filter_candidates(document_name: str | None) -> list[str]:
+    """Build tolerant title/path tokens for incomplete KB title metadata."""
+    if not document_name:
+        return []
+    normalized = _normalize_document_name(document_name) or document_name
+    tokens = [normalized, str(document_name)]
+    # The attachment title may be a longer notice containing the requested
+    # regulation name, while chunks may store only a truncated title. Include
+    # the distinctive regulation phrase as an additional token.
+    for marker in ("办法", "指引", "通知", "规定", "条例"):
+        pos = normalized.find(marker)
+        if pos >= 0:
+            tokens.append(normalized[: pos + len(marker)])
+            break
+    return list(dict.fromkeys(t for t in tokens if t))
+
+
+def _find_document_ids(db_path: Path | str, document_name: str | None) -> list[str]:
+    """Resolve a user document label to IDs using title, path and metadata.
+
+    Some imported PDFs have truncated ``chunks.title`` values, while their
+    complete attachment name remains available in ``local_path``. Resolving
+    IDs first lets retrieval apply an exact ``doc_id`` filter instead of
+    falling back to unrelated documents.
+    """
+    if not document_name:
+        return []
+    p = resolve_path(db_path)
+    if not p.exists():
+        return []
+    tokens = _document_filter_candidates(document_name)
+    if not tokens:
+        return []
+    # Prefer the authoritative parsed-document manifest.  It preserves the
+    # complete attachment title even when SQLite title/path fields were saved
+    # with truncated or mojibake text.
+    manifest_candidates = [
+        resolve_path("data/parsed/meta/doc_meta.jsonl"),
+        resolve_path("data/parsed/meta/generated_manifest.jsonl"),
+    ]
+    wanted = _canonical_title(document_name)
+    manifest_scores: dict[str, int] = {}
+    for manifest in manifest_candidates:
+        if not manifest.exists():
+            continue
+        try:
+            for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                fields = [
+                    row.get("attachment_title"), row.get("title"),
+                    row.get("source_page_title"), row.get("file_name"),
+                    row.get("local_path"),
+                ]
+                score = 0
+                for idx, value in enumerate(fields):
+                    if not value:
+                        continue
+                    candidate = _canonical_title(str(value))
+                    if not wanted or not candidate:
+                        continue
+                    if candidate == wanted:
+                        score = max(score, 100 - idx)
+                    elif wanted in candidate:
+                        score = max(score, 70 - idx)
+                    elif candidate in wanted:
+                        score = max(score, 40 - idx)
+                doc_id = row.get("doc_id")
+                if doc_id and score:
+                    manifest_scores[str(doc_id)] = max(manifest_scores.get(str(doc_id), 0), score)
+        except Exception:
+            continue
+    if manifest_scores:
+        return [doc_id for doc_id, _ in sorted(manifest_scores.items(), key=lambda item: item[1], reverse=True)]
+
+    conn = sqlite3.connect(p)
+    try:
+        ids: list[str] = []
+        for token in tokens:
+            like = f"%{token}%"
+            rows = conn.execute(
+                """SELECT DISTINCT doc_id FROM chunks
+                   WHERE title LIKE ? OR local_path LIKE ? OR metadata_json LIKE ?""",
+                (like, like, like),
+            ).fetchall()
+            for row in rows:
+                if row[0] and row[0] not in ids:
+                    ids.append(str(row[0]))
+        return ids
+    finally:
+        conn.close()
+
+
+def _preferred_document_ids(db_path: Path | str, document_name: str | None) -> list[str]:
+    """Return the primary document plus same-family attachments.
+
+    For a regulation title, the main PDF should rank first; attachments are
+    retained only when they share the same parsed document family.
+    """
+    ids = _find_document_ids(db_path, document_name)
+    if not ids:
+        return []
+    if len(ids) == 1:
+        return ids
+    p = resolve_path(db_path)
+    conn = sqlite3.connect(p)
+    try:
+        placeholders = ",".join("?" for _ in ids)
+        rows = conn.execute(
+            f"SELECT doc_id, MIN(chunk_type='clause') FROM chunks WHERE doc_id IN ({placeholders}) GROUP BY doc_id",
+            ids,
+        ).fetchall()
+        # Clause-bearing main documents precede spreadsheet-only attachments.
+        clause_ids = [str(r[0]) for r in rows if r[1]]
+        rest = [doc_id for doc_id in ids if doc_id not in clause_ids]
+        return clause_ids + rest
+    finally:
+        conn.close()
+
+
 def find_matching_table_titles(
     db_path: Path | str,
     file_name: str | None,
@@ -60,6 +206,21 @@ def find_matching_table_titles(
             rows = cursor.fetchall()
             if rows:
                 return [r[0] for r in rows]
+
+            # Titles in the source attachments are not consistent about
+            # where the year and the quarter marker are placed. Compare
+            # canonical forms after a broad family-name lookup.
+            family = re.sub(r"(?:19|20)\d{2}年", "", file_name)
+            family = re.sub(r"[（(].*?[）)]", "", family).strip()
+            cursor.execute(
+                "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND title LIKE ?",
+                (f"%{family}%",),
+            )
+            candidates = [r[0] for r in cursor.fetchall()]
+            wanted = _canonical_title(file_name)
+            matches = [t for t in candidates if _canonical_title(t) == wanted]
+            if matches:
+                return matches
 
         # 2. Synonyms & Quarter normalizations
         if file_name:
@@ -328,6 +489,20 @@ class MultiTargetRetriever:
             matched_titles = find_matching_table_titles(
                 self.db_path, file_name, sheet_name
             )
+            if not matched_titles and sheet_name:
+                # Fallback for year/parenthesis ordering variants in Excel
+                # attachment titles (the sheet name is stable).
+                clean_sheet = re.sub(r"[（(](?:季度|月度)[）)]", "", sheet_name).strip()
+                rows = sqlite3.connect(self.db_path).execute(
+                    "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND sheet_name LIKE ?",
+                    (f"%{clean_sheet}%",),
+                ).fetchall()
+                year = re.search(r"(?:19|20)\d{2}", file_name or "")
+                year_text = year.group(0) if year else ""
+                matched_titles = [
+                    r[0] for r in rows
+                    if not year_text or year_text in str(r[0]) or year_text in str(r[0]).replace("年", "")
+                ] or [r[0] for r in rows]
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -409,8 +584,14 @@ class MultiTargetRetriever:
         self, task: TargetRetrievalTask, top_k: int = 3
     ) -> TargetRetrievalResult:
         """Execute discrete fact retrieval for a single choice option claim/sub-claims."""
-        doc_name = task.source_constraints.get("document_name")
+        doc_name = _normalize_document_name(task.source_constraints.get("document_name"))
         filters = {"title": doc_name} if doc_name else {}
+        doc_ids = _preferred_document_ids(self.db_path, doc_name)
+        if doc_ids:
+            filters = {"doc_id": doc_ids[0]}
+        doc_ids = _preferred_document_ids(self.db_path, doc_name)
+        if doc_ids:
+            filters = {"doc_id": doc_ids[0]}
 
         evidence: list[SearchResult] = []
 
@@ -423,7 +604,32 @@ class MultiTargetRetriever:
                     filters=filters,
                     rerank=True,
                 )
-                for sr in sc_res[:2]:
+                # For factual options, also query structured table chunks;
+                # compact rows often contain the decisive value even when
+                # clause-text search returns only surrounding prose.
+                table_res = self.reader.search(
+                    sub_claim,
+                    top_k=3,
+                    chunk_type="table",
+                    filters=filters,
+                    rerank=True,
+                )
+                if table_res:
+                    seen = {x.chunk_id for x in table_res}
+                    # Put structured rows first so the per-subclaim evidence
+                    # budget does not discard the decisive table value.
+                    sc_res = list(table_res) + [x for x in sc_res if x.chunk_id not in seen]
+                # KB title metadata can be truncated (for example, only the
+                # issuing notice prefix). Retry without the title filter when
+                # the requested document is known to exist by path/doc family.
+                if not sc_res and doc_name:
+                    sc_res = self.reader.search(
+                        sub_claim,
+                        top_k=2,
+                        filters=({"doc_id": doc_ids[0]} if doc_ids else {}),
+                        rerank=True,
+                    )
+                for sr in sc_res[:4]:
                     if not any(e.chunk_id == sr.chunk_id for e in evidence):
                         sr.metadata["matched_target_task"] = task.task_id
                         sr.metadata["matched_sub_claim"] = sub_claim
@@ -435,6 +641,13 @@ class MultiTargetRetriever:
                 filters=filters,
                 rerank=True,
             )
+            if not claim_res and doc_name:
+                claim_res = self.reader.search(
+                    task.target,
+                    top_k=top_k,
+                    filters=({"doc_id": doc_ids[0]} if doc_ids else {}),
+                    rerank=True,
+                )
             for sr in claim_res:
                 sr.metadata["matched_target_task"] = task.task_id
                 evidence.append(sr)
@@ -452,7 +665,7 @@ class MultiTargetRetriever:
         self, task: TargetRetrievalTask, top_k: int = 5
     ) -> TargetRetrievalResult:
         """Execute standard direct fact retrieval."""
-        doc_name = task.source_constraints.get("document_name")
+        doc_name = _normalize_document_name(task.source_constraints.get("document_name"))
         filters = {"title": doc_name} if doc_name else {}
         evidence = self.reader.search(
             task.target,
@@ -460,6 +673,13 @@ class MultiTargetRetriever:
             filters=filters,
             rerank=True,
         )
+        if not evidence and doc_ids:
+            evidence = self.reader.search(
+                task.target,
+                top_k=top_k,
+                filters={"doc_id": doc_ids[0]},
+                rerank=True,
+            )
         for sr in evidence:
             sr.metadata["matched_target_task"] = task.task_id
 

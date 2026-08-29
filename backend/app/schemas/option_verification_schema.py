@@ -20,6 +20,7 @@ class SubClaimVerification:
     sub_claim: str
     verdict: VerdictType
     score: float = 0.0
+    similarity: float = 0.0
     evidence_ids: list[str] = field(default_factory=list)
     supporting_text: str = ""
     contradiction_detail: str | None = None
@@ -30,12 +31,12 @@ class SubClaimVerification:
             "sub_claim": self.sub_claim,
             "verdict": self.verdict,
             "score": round(self.score, 3),
+            "similarity": round(self.similarity, 4),
             "evidence_ids": self.evidence_ids,
             "supporting_text": self.supporting_text,
             "contradiction_detail": self.contradiction_detail,
             "reason": self.reason,
         }
-
 
 @dataclass(slots=True)
 class OptionVerificationItem:
@@ -45,6 +46,12 @@ class OptionVerificationItem:
     verdict: VerdictType
     evidence_ids: list[str] = field(default_factory=list)
     confidence: float = 0.0
+    max_similarity: float = 0.0
+    source_match: float = 0.0
+    entailment_support: float = 0.0
+    relative_margin: float = 0.0
+    contradiction_probability: float = 0.0
+    ranking_score: float = 0.0
     sub_claims: list[SubClaimVerification] = field(default_factory=list)
     contradiction_detail: str | None = None
     reason: str = ""
@@ -56,6 +63,12 @@ class OptionVerificationItem:
             "verdict": self.verdict,
             "evidence_ids": self.evidence_ids,
             "confidence": round(self.confidence, 4),
+            "R_i": round(self.max_similarity, 4),
+            "M_i": round(self.source_match, 4),
+            "E_i": round(self.entailment_support, 4),
+            "Delta_i": round(self.relative_margin, 4),
+            "N_i": round(self.contradiction_probability, 4),
+            "C_i": round(self.ranking_score, 4),
             "reason": self.reason,
         }
         if self.sub_claims:

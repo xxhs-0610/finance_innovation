@@ -164,6 +164,23 @@ class ChatController {
               <!-- Main Body -->
               <div class="assistant-body">${msg.body || ''}</div>
 
+              ${msg.verification?.optionFeatures && Object.keys(msg.verification.optionFeatures).length > 0 ? `
+                <div style="margin-top:8px; padding:8px 10px; background:var(--bg-subtle); border-radius:var(--radius-sm); font-size:11px;">
+                  <div style="font-weight:600; margin-bottom:5px;">选项证据评分</div>
+                  ${Object.entries(msg.verification.optionFeatures).map(([label, f]) => `
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin:3px 0;">
+                      <strong>${label}</strong>
+                      <span>相似度 R=${Number(f.R_i ?? 0).toFixed(3)}</span>
+                      <span>支持 E=${Number(f.E_i ?? 0).toFixed(3)}</span>
+                      <span>文件 M=${Number(f.M_i ?? 0).toFixed(3)}</span>
+                      <span>区分 Delta=${Number(f.Delta_i ?? 0).toFixed(3)}</span>
+                      <span>矛盾 N=${Number(f.N_i ?? 0).toFixed(3)}</span>
+                      <span>综合 C=${Number(f.C_i ?? 0).toFixed(3)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+
               <!-- Citations -->
               ${msg.citations && msg.citations.length > 0 ? `
                 <div class="citation-box">

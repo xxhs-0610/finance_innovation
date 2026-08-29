@@ -346,11 +346,12 @@ class AuditLogger:
             return "RETRIEVAL_FAILED", "检索错：检索模块未召回任何有效知识切片 [Stage: RETRIEVAL]"
 
         # Case 4: Table Lookup / Extraction
-        if error_code == "MISSING_OPERAND" or executor_status == "MISSING_OPERAND" or intermediate_missing:
+        is_table_task = router_task_type in {"TABLE_COMPARE", "TABLE_CALCULATION", "TABLE_LOOKUP"}
+        if is_table_task and (error_code == "MISSING_OPERAND" or executor_status == "MISSING_OPERAND" or intermediate_missing):
             return "MISSING_OPERAND", "取数错：表格中未定位或未能提取指定候选指标/操作数 [Stage: TABLE_EXECUTION]"
 
         # Case 5: Table Calculation
-        if error_code == "CALCULATION_FAILED" or executor_status == "CALCULATION_ERROR":
+        if is_table_task and (error_code == "CALCULATION_FAILED" or executor_status == "CALCULATION_ERROR"):
             return "CALCULATION_FAILED", "计算错：算术执行器遭遇异常（如除零、数学执行错误） [Stage: TABLE_EXECUTION]"
 
         # Case 6: Option Verification

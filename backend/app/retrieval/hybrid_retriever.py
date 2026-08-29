@@ -16,13 +16,10 @@ from app.retrieval.vector_retriever import KnowledgeBaseVectorBackend, VectorRet
 from app.retrieval.multi_target_retriever import multi_target_retriever
 from app.schemas.chunk_schema import SearchResult
 from app.schemas.retrieval_schema import QueryAnalysis, RetrievalResponse
-<<<<<<< HEAD
 from app.utils.logger import get_logger
+from app.utils.paths import resolve_path
 
 logger = get_logger("app.retrieval.hybrid")
-=======
-from app.utils.paths import resolve_path
->>>>>>> bf680b9d6881c682d5c0b0a3dc42cfa36a310898
 
 
 class CandidateRetriever(Protocol):
@@ -60,8 +57,12 @@ class HybridRetriever:
         top_k: int = 5,
         task_type: str | None = None,
         options: dict[str, str] | None = None,
+        semantic_hint: dict[str, Any] | None = None,
     ) -> RetrievalResponse:
-        analysis = parse_query(question, task_type=task_type, options=options)
+        analysis = parse_query(
+            question, task_type=task_type, options=options,
+            semantic_hint=semantic_hint,
+        )
         logger.info(
             f"[HybridRetriever] 意图解析: query='{question}', task_type='{analysis.task_type}', "
             f"type='{analysis.query_type}', topic='{analysis.topic}', institution='{analysis.institution_type}', "
@@ -263,12 +264,9 @@ class HybridRetriever:
                 "recall_counts": {name: len(res) for name, res in result_sets.items()},
                 "retrievers": retriever_diagnostics,
                 "reranker": reranker_diagnostics,
-<<<<<<< HEAD
                 "rerank_top": rerank_top,
-=======
                 "entity_consistency": entity_filter_diagnostics,
                 "evidence_rejection": evidence_rejection,
->>>>>>> bf680b9d6881c682d5c0b0a3dc42cfa36a310898
                 "failures": failures,
             },
             module4_guidance=_module4_guidance(analysis, status, evidence),
@@ -342,6 +340,7 @@ def retrieve(
     top_k: int = 5,
     task_type: str | None = None,
     options: dict[str, str] | None = None,
+    semantic_hint: dict[str, Any] | None = None,
     *,
     db_path: str | Path = "data/processed/kb_rebuild/metadata.db",
     index_dir: str | Path = "indexes/kb_rebuild",
@@ -361,7 +360,10 @@ def retrieve(
         ],
         reranker=RuleBasedReranker(),
     )
-    return retriever.search(question, top_k=top_k, task_type=task_type, options=options)
+    return retriever.search(
+        question, top_k=top_k, task_type=task_type, options=options,
+        semantic_hint=semantic_hint,
+    )
 
 
 def retrieve_evidence(

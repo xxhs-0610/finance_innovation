@@ -57,6 +57,22 @@ class ModelSettings(BaseModel):
     )
 
 
+class OptionCalibrationSettings(BaseModel):
+    """Weights for option evidence confidence calibration.
+
+    These are configurable fallback weights.  They are deliberately kept out
+    of the verifier so a labelled validation split can later fit replacement
+    coefficients without changing retrieval or decision code.
+    """
+
+    beta0: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA0", "-1.2")))
+    beta1: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA1", "2.2")))
+    beta2: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA2", "2.8")))
+    beta3: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA3", "0.8")))
+    beta4: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA4", "1.4")))
+    beta5: float = Field(default_factory=lambda: float(os.getenv("OPTION_CAL_BETA5", "2.5")))
+
+
 class LogSettings(BaseModel):
     level: str = "INFO"
     log_file: Path = Field(default_factory=lambda: Path(__file__).resolve().parents[2] / "logs" / "app.log")
@@ -70,6 +86,7 @@ class AppConfig(BaseModel):
     server: ServerSettings = Field(default_factory=ServerSettings)
     paths: PathSettings = Field(default_factory=PathSettings)
     models: ModelSettings = Field(default_factory=ModelSettings)
+    option_calibration: OptionCalibrationSettings = Field(default_factory=OptionCalibrationSettings)
     logging: LogSettings = Field(default_factory=LogSettings)
 
 

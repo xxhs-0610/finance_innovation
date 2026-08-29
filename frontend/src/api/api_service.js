@@ -122,11 +122,15 @@ export class APIService {
     const evidenceList = data.evidence || [];
     const verification = data.verification || {};
     const diag = data.diagnostics || {};
+    const optionVerification = verification.option_verification || data.option_verification || {};
+    const optionFeatures = optionVerification.diagnostics?.option_features || {};
 
     // 1. Sync real returned evidence items into global state so user can review them immediately
     if (evidenceList.length > 0 && window.appState) {
       const mappedEvidences = evidenceList.map((ev, idx) => {
         const src = ev.source || {};
+        const meta = ev.metadata || {};
+        const displayTitle = meta.attachment_title || meta.source_page_title || src.title || (src.local_path ? src.local_path.split(/[\/\\]/).pop() : '监管制度文档');
         const isTable = ev.chunk_type === 'table' || src.table_name || src.sheet_name;
         const isPdf = (src.local_path && src.local_path.endsWith('.pdf')) || (src.title && src.title.includes('pdf'));
         const type = isTable ? 'excel' : isPdf ? 'pdf' : 'word';
@@ -144,13 +148,13 @@ export class APIService {
         return {
           id: `ev_${idx}`,
           citationId: ev.citation_id || `E${idx + 1}`,
-          title: src.title || (src.local_path ? src.local_path.split(/[\/\\]/).pop() : '监管制度文档'),
+          title: displayTitle,
           type: type,
           docId: src.doc_id || `DOC-${idx + 1}`,
           score: typeof ev.score === 'number' ? ev.score.toFixed(3) : (ev.score || '0.900'),
           loc: locStr.trim(),
           quote: ev.text || '',
-          fullDocTitle: src.title || '银行业监管制度与统计报表',
+          fullDocTitle: displayTitle,
           promulgation: src.issuer || '国家金融监督管理总局',
           docNo: src.doc_no || '-',
           validity: '现行有效',
@@ -205,12 +209,13 @@ export class APIService {
       bodyHtml = restHtml;
     }
 
-    const citations = evidenceList.map((ev, idx) => {
-      const src = ev.source || {};
+      const citations = evidenceList.map((ev, idx) => {
+        const src = ev.source || {};
+        const meta = ev.metadata || {};
       let locText = src.clause_no ? `条款: ${src.clause_no}` : (src.sheet_name ? `Sheet: ${src.sheet_name}` : (src.table_name ? `表: ${src.table_name}` : '段落'));
       return {
         id: `ev_${idx}`,
-        title: src.title || (src.local_path ? src.local_path.split(/[\/\\]/).pop() : '监管文件'),
+        title: meta.attachment_title || meta.source_page_title || src.title || (src.local_path ? src.local_path.split(/[\/\\]/).pop() : '监管文件'),
         loc: locText,
         chunkId: ev.chunk_id || `CHUNK-${idx + 1}`,
         score: typeof ev.score === 'number' ? ev.score.toFixed(3) : 0.90
@@ -232,7 +237,9 @@ export class APIService {
         numCheck: verification.passed ? '核验通过 (100%)' : (verification.issues?.length ? '存在差异' : '已核验'),
         hallucinationCheck: status === 'refused' ? '已拦截' : '无幻觉',
         retrievalLatency: rLatency,
-        genLatency: gLatency
+        genLatency: gLatency,
+        optionFeatures: optionFeatures,
+        optionVerification: optionVerification
       },
       riskTip: riskTip
     };

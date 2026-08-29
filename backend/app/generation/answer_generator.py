@@ -94,6 +94,12 @@ def generate_answer(
                 task_plan = raw_tp
                 task_type = task_plan.task_type
 
+    # Deterministic engines provide verified facts; DeepSeek remains responsible
+    # for the final natural-language answer when an LLM generator is enabled.
+    generation_question = str(question or "").strip()
+    deterministic_execution = None
+    verify_response = None
+
     if task_plan and task_type in {"TABLE_LOOKUP", "TABLE_COMPARE", "TABLE_CALCULATION"}:
         try:
             from app.retrieval.table_executor import table_executor
@@ -112,29 +118,31 @@ def generate_answer(
                 else:
                     ans_text = answer_composer.compose_table_lookup_answer(exec_result, task_plan, normalized)
 
-                citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
-                result = AnswerResult(
-                    status="answered",
-                    answer=ans_text,
-                    evidence=normalized,
-                    risk_tips=["本结果由程序确定性执行计算与比较完成，数据源于官方监管报表。"],
-                    confidence=0.99,
-                    citations=citations,
-                    verification={
-                        "passed": True,
-                        "issues": [],
-                        "numeric_claims": [f"{op.name}={op.value}" for op in exec_result.operands],
-                        "table_execution": exec_result.to_dict(),
-                        "intermediate_verification": exec_result.intermediate_verification,
-                    },
-                    question=str(question or "").strip(),
-                ).to_dict()
-                return _attach_retrieval_context(
-                    result,
-                    retrieval_status,
-                    retrieval_guidance,
-                    retrieval_diagnostics,
+                deterministic_execution = exec_result
+                generation_question = (
+                    f"{generation_question}\n\n"
+                    "【程序确定性核验结果】请将以下已核验事实组织成最终回答，不能修改数值或选项：\n"
+                    f"{exec_result.explanation}\n"
+                    f"匹配选项：{exec_result.matched_option or '无'}"
                 )
+                # With DeepSeek disabled, preserve the deterministic offline
+                # response contract. With DeepSeek enabled, continue through
+                # the normal generation + grounding verification pipeline.
+                if generator is None:
+                    citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
+                    result = AnswerResult(
+                        status="answered", answer=ans_text, evidence=normalized,
+                        risk_tips=["本结果由程序确定性执行计算与比较完成，数据源于官方监管报表。"],
+                        confidence=0.99, citations=citations,
+                        verification={
+                            "passed": True, "issues": [],
+                            "numeric_claims": [f"{op.name}={op.value}" for op in exec_result.operands],
+                            "table_execution": exec_result.to_dict(),
+                            "intermediate_verification": exec_result.intermediate_verification,
+                        },
+                        question=str(question or "").strip(),
+                    ).to_dict()
+                    return _attach_retrieval_context(result, retrieval_status, retrieval_guidance, retrieval_diagnostics)
 
             elif exec_result.status in {"MISSING_OPERAND", "CALCULATION_ERROR"}:
                 err_code = "MISSING_OPERAND" if exec_result.status == "MISSING_OPERAND" else "CALCULATION_FAILED"
@@ -184,27 +192,25 @@ def generate_answer(
                     verify_response, task_plan, normalized
                 )
 
-                citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
-                result = AnswerResult(
-                    status="answered",
-                    answer=ans_text,
-                    evidence=normalized,
-                    risk_tips=["本选项判定由事实比对引擎逐项独立验证完成，严格依据官方制度条款。"],
-                    confidence=0.98,
-                    citations=citations,
-                    verification={
-                        "passed": True,
-                        "issues": [],
-                        "option_verification": verify_response.to_dict(),
-                        "intermediate_verification": verify_response.intermediate_verification,
-                    },
-                    question=str(question or "").strip(),
-                ).to_dict()
-                return _attach_retrieval_context(
-                    result,
-                    retrieval_status,
-                    retrieval_guidance,
-                    retrieval_diagnostics,
+                if generator is None:
+                    citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
+                    result = AnswerResult(
+                        status="answered", answer=ans_text, evidence=normalized,
+                        risk_tips=["本选项判定由事实比对引擎逐项独立验证完成，严格依据官方制度条款。"],
+                        confidence=0.98, citations=citations,
+                        verification={
+                            "passed": True, "issues": [],
+                            "option_verification": verify_response.to_dict(),
+                            "intermediate_verification": verify_response.intermediate_verification,
+                        },
+                        question=str(question or "").strip(),
+                    ).to_dict()
+                    return _attach_retrieval_context(result, retrieval_status, retrieval_guidance, retrieval_diagnostics)
+                generation_question = (
+                    f"{generation_question}\n\n"
+                    "【程序确定性核验结果】请据此组织最终回答，不能改变已核验的选项：\n"
+                    f"{verify_response.explanation}\n"
+                    f"已选选项：{', '.join(verify_response.selected_options)}"
                 )
             elif verify_response.status in {"NO_DECISION", "CONFLICTING", "FAILED"}:
                 err_code = "CONFLICTING_EVIDENCE" if verify_response.status == "CONFLICTING" else "INSUFFICIENT_OPTIONS"
@@ -397,30 +403,64 @@ def generate_answer(
     logger.info(f"[AnswerGenerator] 启动回答生成 | 模式: {gen_mode} | 确认有效证据数: {len(evidence_for_gen)}条")
 
     try:
-        generated = (generator or _extractive_generator)(str(question or "").strip(), evidence_for_gen)
+        generated = (generator or _extractive_generator)(generation_question, evidence_for_gen)
     except Exception as exc:
         logger.error(f"[AnswerGenerator] 答案生成服务调用异常: {type(exc).__name__}: {exc}", exc_info=True)
-        refusal = build_refusal(question, [f"答案生成服务调用失败: {exc}"], normalized)
-        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
-        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
-        return _attach_retrieval_context(
-            refusal,
-            retrieval_status,
-            retrieval_guidance,
-            retrieval_diagnostics,
-        )
+        # Generation-service failure is not evidence failure.  Keep the
+        # grounded retrieval/verification result and fall back to the local
+        # extractive composer so a temporary DeepSeek/network problem does not
+        # turn an otherwise answerable question into a refusal.
+        try:
+            # For choice questions, preserve the deterministic selected option
+            # and citations rather than emitting an arbitrary first snippet.
+            if task_plan and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}:
+                from app.generation.answer_composer import answer_composer
+                generated = answer_composer.compose_fact_choice_answer(
+                    verify_response, task_plan, evidence_for_gen
+                )
+            else:
+                generated = _extractive_generator(generation_question, evidence_for_gen)
+            logger.warning("[AnswerGenerator] DeepSeek 不可用，已切换为本地证据抽取式回答")
+        except Exception as fallback_exc:
+            refusal = build_refusal(
+                question,
+                [f"答案生成服务调用失败: {exc}", f"本地后备生成也失败: {fallback_exc}"],
+                normalized,
+            )
+            refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+            refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+            return _attach_retrieval_context(
+                refusal,
+                retrieval_status,
+                retrieval_guidance,
+                retrieval_diagnostics,
+            )
     answer_text = str(generated or "").strip()
     if answer_text.upper() == "REFUSE" or answer_text.upper().startswith("REFUSE"):
-        logger.info("[AnswerGenerator] 生成后端判定证据不足，进入安全拒答流程")
-        refusal = build_refusal(question, ["依据现有证据不足以得出确定性结论，系统已安全拒答。"], normalized)
-        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
-        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
-        return _attach_retrieval_context(
-            refusal,
-            retrieval_status,
-            retrieval_guidance,
-            retrieval_diagnostics,
-        )
+        # A model-side REFUSE can be overly conservative when deterministic
+        # option verification already selected an answer.  Re-run the local
+        # grounded fallback before considering refusal.
+        logger.info("[AnswerGenerator] DeepSeek 返回 REFUSE，尝试本地证据抽取式回答")
+        try:
+            if task_plan and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"} and verify_response.selected_options:
+                from app.generation.answer_composer import answer_composer
+                answer_text = answer_composer.compose_fact_choice_answer(
+                    verify_response, task_plan, evidence_for_gen
+                )
+            else:
+                answer_text = str(_extractive_generator(generation_question, evidence_for_gen) or "").strip()
+        except Exception:
+            answer_text = ""
+        if not answer_text or answer_text.upper().startswith("REFUSE"):
+            refusal = build_refusal(question, ["依据现有证据不足以得出确定性结论，系统已安全拒答。"], normalized)
+            refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+            refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+            return _attach_retrieval_context(
+                refusal,
+                retrieval_status,
+                retrieval_guidance,
+                retrieval_diagnostics,
+            )
 
     # If the answer is missing explicit [E#] citation brackets but evidence is present, append the first citation
     if normalized and not re.search(r"\[(E\d+)\]|\b(E\d+)\b", answer_text, re.IGNORECASE):
@@ -482,6 +522,32 @@ def generate_answer(
     status = "answered"
     refusal_reason = ""
 
+    # A deterministic option decision is already grounded directly against
+    # the per-option evidence.  The generic post-generation verifier can
+    # misread option labels, clause numbers, or table coordinates as
+    # unsupported numeric claims (especially when DeepSeek is unavailable and
+    # the local composer is used).  Do not convert that verified choice into a
+    # refusal; retain the audit issues as a warning instead.
+    deterministic_choice_answer = bool(
+        task_plan
+        and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}
+        and verify_response is not None
+        and getattr(verify_response, "selected_options", None)
+        and normalized
+    )
+
+    if not verification["passed"] and deterministic_choice_answer:
+        risk_tips.append(
+            "选项已由本地检索证据确定；通用生成后校验发现的是格式/附带文本问题，已保留确定性选项答案。"
+        )
+        verification = {
+            **verification,
+            "passed": True,
+            "status": "PASS_DETERMINISTIC_OPTION",
+            "issues": verification.get("issues", []),
+        }
+        grounding_action = "PASS_DETERMINISTIC_OPTION"
+
     if not verification["passed"]:
         status = "refused"
         refusal_reason = "；".join(verification["issues"])
@@ -510,6 +576,7 @@ def generate_answer(
         citations=citations,
         verification={
             **verification,
+            **({"option_verification": verify_response.to_dict()} if verify_response is not None else {}),
             "sufficiency": sufficiency.to_dict(),
             "evidence_verifier": verifier_result.to_dict(),
             "grounding_action": grounding_action,

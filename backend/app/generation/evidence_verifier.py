@@ -21,8 +21,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import ssl
 import urllib.request
 from typing import Any
+
+import certifi
 
 from app.generation.deepseek_client import (
     deepseek_api_key,
@@ -340,7 +343,8 @@ class EvidenceVerifier:
                 method="POST",
             )
             timeout = min(deepseek_timeout_seconds(), 15.0)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_context) as resp:
                 if resp.status != 200:
                     return None
                 data = json.loads(resp.read().decode("utf-8"))

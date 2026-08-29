@@ -40,6 +40,7 @@ class RouteDecision:
     need_retrieval: bool = False
     need_clarification: bool = False
     reason: str = ""
+    semantic: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.task_type is None and self.qa_type is not None:
@@ -56,6 +57,7 @@ class RouteDecision:
             "need_retrieval": self.need_retrieval,
             "need_clarification": self.need_clarification,
             "reason": self.reason,
+            "semantic": self.semantic or {},
         }
 
 

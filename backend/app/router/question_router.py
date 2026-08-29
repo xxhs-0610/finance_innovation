@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+import ssl
 import urllib.error
 import urllib.request
 from typing import Any, Optional
+
+import certifi
 
 from app.generation.deepseek_client import (
     deepseek_api_key,
@@ -156,21 +159,23 @@ class QuestionRouter:
             self._log_decision(q, decision)
             return decision
 
-        # 1. Fast deterministic rule evaluation
+        # 1. Fast deterministic rule evaluation. Safety/system boundary results
+        # remain deterministic; domain questions are subsequently reviewed by
+        # DeepSeek so nuanced table-vs-choice semantics are understood first.
         fast_decision = self._fast_rule_route(q)
-        if fast_decision is not None:
+        if fast_decision is not None and fast_decision.intent in {"SYSTEM_META", "OUT_OF_SCOPE"}:
             self._log_decision(q, fast_decision)
             return fast_decision
 
-        # 2. LLM-based classification via DeepSeek JSON mode (if enabled)
+        # 2. DeepSeek semantic review before retrieval for domain questions.
         if deepseek_enabled():
             llm_decision = self._llm_classify(q)
             if llm_decision is not None:
                 self._log_decision(q, llm_decision)
                 return llm_decision
 
-        # 3. Safe fallback rule-based classification
-        fallback_decision = self._safe_fallback_route(q)
+        # 3. Safe fallback when DeepSeek is disabled or temporarily unavailable.
+        fallback_decision = fast_decision or self._safe_fallback_route(q)
         self._log_decision(q, fallback_decision)
         return fallback_decision
 
@@ -434,7 +439,9 @@ class QuestionRouter:
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.0,
-            "max_tokens": 500,
+            # Semantic hints plus four long options can exceed 500 tokens;
+            # allow enough room so JSON is not truncated mid-string.
+            "max_tokens": 1000,
         }
 
         try:
@@ -448,13 +455,26 @@ class QuestionRouter:
                 method="POST",
             )
             timeout = min(deepseek_timeout_seconds(), 10.0)  # fast router timeout
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_context) as resp:
                 if resp.status != 200:
                     return None
                 data = json.loads(resp.read().decode("utf-8"))
                 choice = (data.get("choices") or [{}])[0]
                 content = choice.get("message", {}).get("content", "")
-                parsed = json.loads(content)
+                try:
+                    parsed = json.loads(content)
+                except json.JSONDecodeError:
+                    # Be tolerant of markdown fences or a short preamble from
+                    # providers that ignore response_format. If the payload is
+                    # genuinely truncated, fall back to deterministic routing.
+                    cleaned = str(content or "").strip()
+                    if cleaned.startswith("```"):
+                        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.I | re.S).strip()
+                    start, end = cleaned.find("{"), cleaned.rfind("}")
+                    if start < 0 or end <= start:
+                        raise
+                    parsed = json.loads(cleaned[start : end + 1])
 
                 intent = parsed.get("intent", "DOMAIN_QA")
                 if intent not in {"DOMAIN_QA", "SYSTEM_META", "OUT_OF_SCOPE", "NEED_CLARIFICATION"}:
@@ -485,6 +505,13 @@ class QuestionRouter:
                 need_retrieval = (intent == "DOMAIN_QA")
                 need_clarification = (intent == "NEED_CLARIFICATION")
                 reason = str(parsed.get("reason") or "大模型意图与任务类型判定")
+                semantic = parsed.get("semantic")
+                if not isinstance(semantic, dict):
+                    semantic = {}
+                raw_keywords = semantic.get("keywords") or []
+                if isinstance(raw_keywords, str):
+                    raw_keywords = [raw_keywords]
+                semantic["keywords"] = [str(k).strip() for k in raw_keywords if str(k).strip()]
 
                 return RouteDecision(
                     intent=intent,
@@ -493,6 +520,7 @@ class QuestionRouter:
                     need_retrieval=need_retrieval,
                     need_clarification=need_clarification,
                     reason=reason,
+                    semantic=semantic,
                 )
         except Exception as exc:
             logger.warning(f"[ROUTER] DeepSeek 路由请求异常 (降级至规则引擎): {type(exc).__name__}: {exc}")

@@ -17,6 +17,40 @@ from app.utils.logger import get_logger
 
 logger = get_logger("app.indexing.reader")
 
+_DOC_TITLE_CACHE: dict[str, str] | None = None
+
+
+def _full_document_title(doc_id: str, fallback: str = "") -> str:
+    """Return the complete attachment title for a document ID.
+
+    SQLite chunks may contain a shortened extracted title. The parsed metadata
+    manifest retains the authoritative attachment/file title, which should be
+    exposed to citations and the UI.
+    """
+    global _DOC_TITLE_CACHE
+    if _DOC_TITLE_CACHE is None:
+        _DOC_TITLE_CACHE = {}
+        for manifest_name in ("data/parsed/meta/doc_meta.jsonl", "data/parsed/meta/generated_manifest.jsonl"):
+            manifest = resolve_path(manifest_name)
+            if not manifest.exists():
+                continue
+            try:
+                for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    try:
+                        row = json.loads(line)
+                    except Exception:
+                        continue
+                    key = str(row.get("doc_id") or "")
+                    title = str(row.get("attachment_title") or row.get("file_name") or row.get("title") or "")
+                    if key and title:
+                        # Prefer the complete attachment/file name over a
+                        # shorter parsed title when both manifests contain it.
+                        if key not in _DOC_TITLE_CACHE or len(title) > len(_DOC_TITLE_CACHE[key]):
+                            _DOC_TITLE_CACHE[key] = title
+            except Exception:
+                continue
+    return _DOC_TITLE_CACHE.get(str(doc_id), "") or fallback
+
 
 def _resolve_default_db_path(requested: str | Path) -> Path:
     p = resolve_path(requested)
@@ -258,7 +292,7 @@ def _row_to_search_result(row: sqlite3.Row, *, score: float | None = None) -> Se
         score = float(-row["rank_score"]) if "rank_score" in row.keys() else 0.0
     source = SourceInfo(
         doc_id=row["doc_id"],
-        title=row["title"] or "",
+        title=_full_document_title(row["doc_id"], row["title"] or ""),
         issuer=row["issuer"] or "",
         publish_date=row["publish_date"] or "",
         source_url=row["source_url"] or "",

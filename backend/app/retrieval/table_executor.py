@@ -284,7 +284,12 @@ def match_numeric_option(
         except ValueError:
             continue
 
-    # Accept match if difference is very close (floating-point tolerance or within 0.1% for rounded numbers)
+    # Never force a choice when all candidates are materially different from
+    # the extracted value. Accept exact/display rounding (absolute tolerance)
+    # or a small relative rounding difference only.
+    tolerance = max(0.01, abs(float(result_value)) * 0.001)
+    if best_label is None or min_diff > tolerance:
+        return None, min_diff
     return best_label, min_diff
 
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 import json
+import math
 import re
 from typing import Any, Mapping, Sequence
 
@@ -33,8 +34,23 @@ from app.schemas.option_verification_schema import (
 )
 from app.schemas.task_plan_schema import ChoiceOption, TaskPlan
 from app.utils.logger import get_logger
+from configs.settings import settings
 
 logger = get_logger("app.retrieval.option_verifier")
+
+
+def _sigmoid(value: float) -> float:
+    return 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, value))))
+
+
+def _normalize_document_name(value: str | None) -> str | None:
+    """Match user labels that include a format suffix to KB titles."""
+    if not value:
+        return value
+    name = str(value).strip()
+    name = re.sub(r"\s*[\(\uff08][^\)\uff09]*?(?:pdf|docx?|xlsx?)[^\)\uff09]*[\)\uff09]\s*", "", name, flags=re.I)
+    name = re.sub(r"\.(?:pdf|docx?|xlsx?)$", "", name, flags=re.I)
+    return name.strip() or None
 
 
 def clean_for_match(text: str) -> str:
@@ -48,6 +64,44 @@ def extract_numbers_with_units(text: str) -> list[str]:
         r"\d+(?:\.\d+)?\s*(?:%|％|‰|万亿元|亿元|万元|元|万人|人|户|家|日|个工作日|工作日|年|个月)?",
         text,
     )
+
+
+def _semantic_table_match(claim: str, text: str) -> bool:
+    """Recognize compact table rows whose headers are split from values.
+
+    This is domain independent: it extracts numeric/unit tokens and salient
+    labels (Chinese words, periods, categories) from the claim, then checks
+    that the same signals occur in the serialized table row. It therefore
+    works for insurance, banking, finance, and arbitrary regulatory tables.
+    """
+    c = clean_for_match(claim)
+    t = clean_for_match(text)
+    if not c or not t:
+        return False
+    claim_nums = extract_numbers_with_units(claim)
+    if not claim_nums or any(num.replace(" ", "") not in t for num in claim_nums):
+        return False
+
+    # Keep meaningful lexical markers while ignoring function words and
+    # generic question phrasing. Include period/category/indicator terms.
+    markers = re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z]{2,}", claim)
+    stop = {"平均", "上限", "下列", "表述", "属于", "材料", "内容", "关于", "其中", "选项", "正确", "错误"}
+    salient = [m for m in markers if m not in stop]
+    # Match lexical pieces rather than requiring long phrases to be
+    # contiguous: serialized rows commonly split a category and indicator
+    # (e.g. “个人” ... “意外险=35%”).
+    pieces: list[str] = []
+    for marker in salient:
+        if len(marker) <= 4:
+            pieces.append(marker)
+        else:
+            pieces.extend(marker[i:i + 2] for i in range(0, len(marker) - 1, 2))
+    if pieces and sum(1 for m in pieces if m in text) < max(1, min(3, len(pieces))):
+        return False
+    # At least one structured delimiter/header-value cue should be present.
+    if not re.search(r"[=:：]|单位|%|％", text):
+        return False
+    return True
 
 
 def detect_question_intent_target(question: str) -> str:
@@ -92,6 +146,15 @@ def compute_sliding_similarity(claim: str, text: str) -> tuple[float, str]:
                     return best_ratio, best_sub
 
     return best_ratio, best_sub
+
+
+def _retrieval_score(chunk: Any) -> float:
+    """Use the retrieval/rerank score as a tie-breaker for option evidence."""
+    try:
+        score = float(getattr(chunk, "score", 0.0) or 0.0)
+    except Exception:
+        score = 0.0
+    return score
 
 
 def normalize_num_value(val_str: str, unit: str) -> tuple[float, str]:
@@ -188,7 +251,7 @@ class OptionVerificationEngine:
             else (1 if choice_mode == "SINGLE" else 2)
         )
 
-        doc_name = (
+        doc_name = _normalize_document_name(
             task_plan.source_constraints.document_name
             if task_plan.source_constraints
             else None
@@ -219,6 +282,42 @@ class OptionVerificationEngine:
                 doc_name=doc_name,
             )
             verified_options.append(verified_opt)
+
+        # Compute transparent multi-signal ranking.  These weights are
+        # intentionally simple and local; retrieval similarity is no longer a
+        # standalone veto.  A future labelled validation split can replace the
+        # coefficients without changing the decision interface.
+        raw_r = [max(0.0, min(1.0, self._option_similarity(o))) for o in verified_options]
+        for idx, item in enumerate(verified_options):
+            r_i = raw_r[idx]
+            others = raw_r[:idx] + raw_r[idx + 1 :]
+            margin = r_i - (max(others) if others else 0.0)
+            source_match = 1.0 if doc_name and item.evidence_ids else (0.5 if item.evidence_ids else 0.0)
+            # In multi-fact options, score the proportion of sub-claims that
+            # are explicitly supported rather than collapsing every partial
+            # match to the same weak E_i value.
+            if item.sub_claims:
+                entailment = sum(1.0 for sc in item.sub_claims if sc.verdict == "SUPPORTED") / len(item.sub_claims)
+                if entailment == 0.0 and item.evidence_ids:
+                    entailment = 0.35 * r_i
+            else:
+                entailment = 1.0 if item.verdict == "SUPPORTED" else (0.35 * r_i if item.evidence_ids else 0.0)
+            contradiction = 1.0 if item.verdict == "CONTRADICTED" else 0.0
+            cal = settings.option_calibration
+            ranking = _sigmoid(
+                cal.beta0
+                + cal.beta1 * r_i
+                + cal.beta2 * entailment
+                + cal.beta3 * source_match
+                + cal.beta4 * margin
+                - cal.beta5 * contradiction
+            )
+            item.max_similarity = r_i
+            item.source_match = source_match
+            item.entailment_support = entailment
+            item.relative_margin = margin
+            item.contradiction_probability = contradiction
+            item.ranking_score = ranking
 
         # Determine winner options based on intent target
         selected_options: list[str] = []
@@ -289,6 +388,37 @@ class OptionVerificationEngine:
                 else:
                     selected_options = []
 
+        # Once the requested document is hit, rank options by the combined
+        # evidence signals.  Single choice returns top 1; multi-choice returns
+        # the number requested by the question. Explicit contradictions are
+        # excluded. This is intentionally independent of the old 0.70 gate.
+        if question_intent_target == "INCORRECT":
+            # For a negative-polarity question, contradiction is the desired
+            # signal.  Prefer explicitly contradicted options; if none were
+            # established, fall back to evidence-backed non-supported options
+            # instead of returning NO_DECISION solely because similarity is
+            # below the old fixed threshold.
+            candidate_pool = [
+                o for o in verified_options
+                if o.evidence_ids and o.verdict == "CONTRADICTED"
+            ]
+            if not candidate_pool:
+                candidate_pool = [
+                    o for o in verified_options
+                    if o.evidence_ids and o.verdict != "SUPPORTED"
+                ]
+        else:
+            candidate_pool = [
+                o for o in verified_options
+                if o.evidence_ids and o.verdict != "CONTRADICTED"
+            ]
+        ranked_candidates = sorted(candidate_pool, key=lambda o: o.ranking_score, reverse=True)
+        if ranked_candidates:
+            if choice_mode == "SINGLE":
+                selected_options = [ranked_candidates[0].option]
+            else:
+                selected_options = [o.option for o in ranked_candidates[:required_count]]
+
         status = "SUCCESS" if selected_options else "NO_DECISION"
 
         # Construct explanation
@@ -346,6 +476,27 @@ class OptionVerificationEngine:
                 "task_type": task_type,
                 "winner_count": len(selected_options),
                 "intent_target": question_intent_target,
+                "option_features": {
+                    o.option: {
+                        "R_i": round(o.max_similarity, 4),
+                        "E_i": round(o.entailment_support, 4),
+                        "M_i": round(o.source_match, 4),
+                        "Delta_i": round(o.relative_margin, 4),
+                        "N_i": round(o.contradiction_probability, 4),
+                        "C_i": round(o.ranking_score, 4),
+                    }
+                    for o in verified_options
+                },
+                "decision_policy": (
+                    "SINGLE_TOP1_WITH_EVIDENCE"
+                    if choice_mode == "SINGLE"
+                    else f"MULTI_TOP{required_count}_WITH_EVIDENCE"
+                ),
+                "decision_reason": (
+                    "按综合 C_i 排序取最高选项；不使用固定相似度一票否决"
+                    if choice_mode == "SINGLE"
+                    else f"按综合 C_i 排序取前 {required_count} 个有证据且未明确矛盾的选项；不使用固定相似度一票否决"
+                ),
                 "intermediate_verification": interm_verification_dict,
             },
         )
@@ -389,7 +540,11 @@ class OptionVerificationEngine:
                 reason = (
                     f"选项中部分子表述（{len(unsupported_claims)}项）未能在指定文件中检索到有效条款"
                 )
-                ev_ids = []
+                # Preserve any retrieved evidence from supported or partially
+                # matched sub-claims.  A multi-fact option must still be
+                # rankable by R_i/M_i when strict all-subclaim entailment is
+                # unavailable; clearing this list caused over-refusal.
+                ev_ids = [eid for sr in sub_results for eid in sr.evidence_ids if eid]
                 confidence = 0.50
 
             return OptionVerificationItem(
@@ -436,6 +591,7 @@ class OptionVerificationEngine:
         best_chunk = None
         best_chunk_id = ""
         best_score = 0.0
+        best_semantic = False
 
         adapted_list = evidence_adapter.adapt_list(evidence_list)
         for chunk in adapted_list:
@@ -445,15 +601,44 @@ class OptionVerificationEngine:
             title = chunk.source_title
 
             # Check document filter
-            if doc_name and title and doc_name not in title and title not in doc_name:
-                continue
+            if doc_name:
+                wanted_title = _normalize_document_name(doc_name) or doc_name
+                metadata = getattr(chunk, "metadata", {}) or {}
+                source_candidates = [
+                    title,
+                    getattr(chunk, "local_path", ""),
+                    metadata.get("source_page_title", "") if isinstance(metadata, dict) else "",
+                    metadata.get("file_name", "") if isinstance(metadata, dict) else "",
+                    metadata.get("document_name", "") if isinstance(metadata, dict) else "",
+                ]
+                matched = False
+                for candidate in source_candidates:
+                    actual_title = _normalize_document_name(str(candidate)) or str(candidate)
+                    if wanted_title in actual_title or actual_title in wanted_title:
+                        matched = True
+                        break
+                if not matched:
+                    continue
 
             ratio, _ = compute_sliding_similarity(claim, text)
-            if ratio > best_ratio:
+            semantic_match = _semantic_table_match(claim, text)
+            # Retain the best eligible chunk by text match, then retrieval
+            # score. This prevents equal fuzzy scores from selecting an
+            # arbitrary clause and helps distinguish the correct C option.
+            # Retain the first eligible chunk even when fuzzy similarity is
+            # zero.  Retrieval hit itself is evidence that can be surfaced and
+            # ranked; similarity is a feature, not a hard veto.
+            if (
+                (semantic_match and not best_semantic)
+                or (semantic_match == best_semantic and ratio > best_ratio)
+                or (semantic_match == best_semantic and ratio == best_ratio and _retrieval_score(chunk) > best_score)
+                or best_chunk is None
+            ):
                 best_ratio = ratio
                 best_chunk = chunk
                 best_chunk_id = chunk_id
                 best_score = score
+                best_semantic = semantic_match
 
         if best_chunk:
             best_text = (
@@ -475,12 +660,24 @@ class OptionVerificationEngine:
                         reason=f"存在明确事实矛盾: {contra_msg}",
                     )
 
-            # 2. Support check on best matching chunk
-            if best_ratio >= 0.70:
+            # 2. Support check on best matching chunk. Short numbered clauses
+            # may be split from the surrounding sentence; exact substring
+            # matching is accepted even when the fuzzy ratio is lower.
+            compact_claim = re.sub(r"[\s。；;，,：:（）()]+", "", clean_claim)
+            compact_text = re.sub(r"^[0-9一二三四五六七八九十]+[.、)]?", "", str(best_text or "").strip())
+            compact_text = re.sub(r"[\s。；;，,：:（）()]+", "", compact_text)
+            exact_clause = (
+                (len(compact_text) >= 8 and compact_text in compact_claim)
+                or (len(clean_for_match(str(best_text or ""))) >= 8
+                    and clean_for_match(str(best_text or "")) in clean_for_match(claim))
+                or _semantic_table_match(claim, str(best_text or ""))
+            )
+            if best_ratio >= 0.70 or exact_clause:
                 return SubClaimVerification(
                     sub_claim=claim,
                     verdict="SUPPORTED",
                     score=best_score,
+                    similarity=best_ratio,
                     evidence_ids=[best_chunk_id],
                     supporting_text=best_text[:120],
                     reason=f"与监管条款原文表述高度吻合（文本相似度: {best_ratio * 100:.1f}%）",
@@ -490,8 +687,25 @@ class OptionVerificationEngine:
             sub_claim=claim,
             verdict="NOT_ENOUGH_EVIDENCE",
             score=best_ratio,
+            similarity=best_ratio,
+            evidence_ids=[best_chunk_id] if best_chunk_id else [],
+            supporting_text=(
+                (
+                    getattr(best_chunk, "content", None)
+                    or getattr(best_chunk, "text", None)
+                    or (best_chunk.get("text", "") if isinstance(best_chunk, dict) else "")
+                )[:120]
+                if best_chunk is not None
+                else ""
+            ),
             reason=f"在知识库中未检索到充分的支持证据（最高相似度: {best_ratio * 100:.1f}%）",
         )
+
+    @staticmethod
+    def _option_similarity(item: OptionVerificationItem) -> float:
+        if item.sub_claims:
+            return max((float(getattr(s, "similarity", s.score)) for s in item.sub_claims), default=0.0)
+        return 0.0
 
     def _normalize_retrieval_input(
         self,

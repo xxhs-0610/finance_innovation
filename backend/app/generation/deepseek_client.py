@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import ssl
 import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+import certifi
 
 from app.generation.prompt_builder import build_generation_prompt
 from app.utils.logger import get_logger
@@ -129,7 +132,7 @@ def deepseek_generator(
                 f"[DeepSeek] 大模型调用成功 | 耗时: {duration:.2f}s | 模型: {model} | 生成长度: {len(answer_text)} 字符"
             )
             return answer_text
-        except (DeepSeekAPIError, TimeoutError, error.URLError) as exc:
+        except (DeepSeekAPIError, TimeoutError, error.URLError, ssl.SSLError) as exc:
             last_error = exc
             logger.warning(
                 f"[DeepSeek] 第 {attempt + 1}/{retries + 1} 次调用遇到异常: {type(exc).__name__}: {exc}"
@@ -154,7 +157,13 @@ def _post_json(endpoint: str, api_key: str, body: bytes, timeout: float) -> dict
         method="POST",
     )
     try:
-        with request.urlopen(req, timeout=timeout) as response:
+        # Do not load the Windows certificate store here. Some machines contain
+        # malformed certificates that make OpenSSL fail with
+        # ASN1: NOT_ENOUGH_DATA before the HTTPS request is even sent. Certifi's
+        # maintained CA bundle gives this client a deterministic trust store
+        # while keeping normal TLS certificate and hostname verification on.
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        with request.urlopen(req, timeout=timeout, context=ssl_context) as response:
             raw = response.read().decode("utf-8")
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:500]
