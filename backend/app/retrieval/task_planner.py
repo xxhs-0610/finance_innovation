@@ -117,13 +117,15 @@ class TaskPlanner:
 
         norm_task_type = self._normalize_task_type(effective_task_type or self._detect_task_type(stem, effective_opts))
 
-        if self._is_numeric_table_lookup(raw, effective_opts):
-            norm_task_type = "TABLE_LOOKUP"
-
         # A question that names an Excel/report source and asks for one value is
         # a table lookup even when it is presented with A-D numeric answers.
-        # The options are answer candidates, not independent retrieval targets.
-        if self._is_numeric_table_lookup(raw, effective_opts):
+        # Calculation wording still takes precedence: its numeric options are
+        # answer candidates while the operands must be retrieved separately.
+        calculation_signal = re.search(
+            r"(?:两处取数|取数并计算|数值变化|相差|差距|差额|从[“\"‘'].*?[”\"’']到)",
+            raw,
+        )
+        if self._is_numeric_table_lookup(raw, effective_opts) and not calculation_signal:
             norm_task_type = "TABLE_LOOKUP"
 
         # 2. Extract common entities (Strictly without hallucination)
