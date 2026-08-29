@@ -20,6 +20,7 @@ import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Sequence
+from dataclasses import replace
 
 from app.indexing.index_reader import KnowledgeBaseReader
 from app.schemas.chunk_schema import SearchResult, SourceInfo
@@ -197,15 +198,46 @@ def find_matching_table_titles(
     conn = sqlite3.connect(p)
     cursor = conn.cursor()
     try:
+        requested_years = set(re.findall(r"(?:19|20)\d{2}", str(file_name or "")))
+
+        def query_titles(pattern: str) -> list[str]:
+            """Return titles matching a name while respecting an explicit year."""
+            if not pattern:
+                return []
+            like = f"%{pattern}%"
+            if not requested_years:
+                cursor.execute(
+                    "SELECT DISTINCT title FROM chunks "
+                    "WHERE chunk_type='table' AND (title LIKE ? OR table_name LIKE ?)",
+                    (like, like),
+                )
+                return [r[0] for r in cursor.fetchall()]
+
+            # A source title can be normalized by module 1 (for example the year
+            # is moved into table_name or the row text). Keep only candidates
+            # carrying the requested year in one of those authoritative fields.
+            year_clauses = []
+            year_params: list[str] = []
+            for year in sorted(requested_years):
+                year_like = f"%{year}%"
+                year_clauses.append(
+                    "(title LIKE ? OR table_name LIKE ? OR metadata_json LIKE ?)"
+                )
+                year_params.extend([year_like, year_like, f'%\"period\": \"{year}\"%'])
+            cursor.execute(
+                "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' "
+                "AND (title LIKE ? OR table_name LIKE ?) AND ("
+                + " OR ".join(year_clauses)
+                + ")",
+                [like, like, *year_params],
+            )
+            return [r[0] for r in cursor.fetchall()]
+
+        candidates: list[str] = []
+
         # 1. Exact LIKE
         if file_name:
-            cursor.execute(
-                "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND title LIKE ?",
-                (f"%{file_name}%",),
-            )
-            rows = cursor.fetchall()
-            if rows:
-                return [r[0] for r in rows]
+            candidates.extend(query_titles(file_name))
 
             # Titles in the source attachments are not consistent about
             # where the year and the quarter marker are placed. Compare
@@ -250,13 +282,7 @@ def find_matching_table_titles(
 
             for v in variants:
                 if v != file_name:
-                    cursor.execute(
-                        "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND title LIKE ?",
-                        (f"%{v}%",),
-                    )
-                    rows = cursor.fetchall()
-                    if rows:
-                        return [r[0] for r in rows]
+                    candidates.extend(query_titles(v))
 
         # 3. Sheet name fallback
         if sheet_name:
@@ -267,15 +293,34 @@ def find_matching_table_titles(
                 .replace("(季度)", "")
                 .strip()
             )
-            cursor.execute(
-                "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND sheet_name LIKE ?",
-                (f"%{clean_sheet}%",),
-            )
-            rows = cursor.fetchall()
-            if rows:
-                return [r[0] for r in rows]
+            if clean_sheet:
+                cursor.execute(
+                    "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND sheet_name LIKE ?",
+                    (f"%{clean_sheet}%",),
+                )
+                candidates.extend(r[0] for r in cursor.fetchall())
 
-        return []
+        # Preserve insertion order, then prefer titles carrying the explicit
+        # source year. A no-year generic title is only acceptable when no year
+        # was present in the request.
+        unique = list(dict.fromkeys(candidates))
+        if requested_years:
+            year_filtered = []
+            for title in unique:
+                cursor.execute(
+                    "SELECT 1 FROM chunks WHERE chunk_type='table' AND title = ? "
+                    f"AND (" + " OR ".join(
+                        "title LIKE ? OR table_name LIKE ? OR metadata_json LIKE ?"
+                        for _ in requested_years
+                    ) + ") LIMIT 1",
+                    [title, *sum(([
+                        f"%{y}%", f"%{y}%", f'%\"period\": \"{y}\"%'
+                    ] for y in sorted(requested_years)), [])],
+                )
+                if cursor.fetchone():
+                    year_filtered.append(title)
+            unique = year_filtered
+        return unique
     finally:
         conn.close()
 
@@ -525,9 +570,37 @@ class MultiTargetRetriever:
                         params.append(f"%{match_term}%")
                         params.append(f"%{match_term}%")
 
+                    # "总资产" appears in several institution sections of the
+                    # quarterly balance-sheet table. When the source explicitly
+                    # names the banking total, bind it to the first overall
+                    # section instead of returning a different institution's
+                    # same-named row.
+                    if file_name and "银行业总资产" in file_name and row_target == "总资产":
+                        where_clauses.append("text LIKE ?")
+                        params.append("%1. 银行业金融机构=总资产%")
+
                     sql = f"SELECT * FROM chunks WHERE {' AND '.join(where_clauses)} LIMIT ?"
                     params.append(top_k * 2)
                     rows = cursor.execute(sql, tuple(params)).fetchall()
+
+                    if file_name and "银行业总资产" in file_name and row_target == "总资产" and rows:
+                        # The workbook repeats the same metric for each
+                        # institution section. The unqualified file-level
+                        # "总资产" means the first overall section; keep its
+                        # row and all of its quarter cells only.
+                        row_indices = []
+                        for row in rows:
+                            try:
+                                metadata = json.loads(row["metadata_json"] or "{}")
+                                row_indices.append(int(metadata.get("row_index")))
+                            except (TypeError, ValueError):
+                                continue
+                        if row_indices:
+                            first_row = min(row_indices)
+                            rows = [
+                                row for row in rows
+                                if json.loads(row["metadata_json"] or "{}").get("row_index") == first_row
+                            ]
 
                     for r in rows:
                         meta = json.loads(r["metadata_json"]) if r["metadata_json"] else {}
@@ -550,13 +623,18 @@ class MultiTargetRetriever:
                             source=source_info,
                             metadata=meta,
                         )
+                        sr = _narrow_table_dimension(sr, col_target)
                         if not any(e.chunk_id == sr.chunk_id for e in evidence):
                             evidence.append(sr)
             finally:
                 conn.close()
 
         # 2. Hybrid Reader Search Fallback/Enrichment
-        if len(evidence) < top_k:
+        # SQL direct matching is authoritative for a constrained table target.
+        # Enriching an already successful match with vector neighbours can add
+        # other rows/columns from the same table and make the evidence package
+        # ambiguous. Fall back only when the precise path found nothing.
+        if not evidence:
             query_str = f"{file_name or ''} {target}".strip()
             filters = {"title": file_name} if file_name else {}
             reader_results = self.reader.search(
@@ -567,6 +645,7 @@ class MultiTargetRetriever:
                 rerank=True,
             )
             for sr in reader_results:
+                sr = _narrow_table_dimension(sr, col_target)
                 if not any(e.chunk_id == sr.chunk_id for e in evidence):
                     sr.metadata["matched_target_task"] = task.task_id
                     evidence.append(sr)
@@ -589,11 +668,6 @@ class MultiTargetRetriever:
         doc_ids = _preferred_document_ids(self.db_path, doc_name)
         if doc_ids:
             filters = {"doc_id": doc_ids[0]}
-        doc_ids = _preferred_document_ids(self.db_path, doc_name)
-        if doc_ids:
-            filters = {"doc_id": doc_ids[0]}
-
-        evidence: list[SearchResult] = []
 
         # If option contains multiple sub-claims (FACT_MULTI_CHOICE paired claims)
         if task.sub_targets and len(task.sub_targets) > 1:
@@ -667,6 +741,7 @@ class MultiTargetRetriever:
         """Execute standard direct fact retrieval."""
         doc_name = _normalize_document_name(task.source_constraints.get("document_name"))
         filters = {"title": doc_name} if doc_name else {}
+        doc_ids = _preferred_document_ids(self.db_path, doc_name)
         evidence = self.reader.search(
             task.target,
             top_k=top_k,
@@ -682,7 +757,6 @@ class MultiTargetRetriever:
             )
         for sr in evidence:
             sr.metadata["matched_target_task"] = task.task_id
-
         status = "SUCCESS" if evidence else "NO_EVIDENCE"
         return TargetRetrievalResult(
             task_id=task.task_id,
@@ -692,21 +766,73 @@ class MultiTargetRetriever:
             diagnostics={"candidate_count": len(evidence)},
         )
 
-    def _merge_results(
-        self, results: list[TargetRetrievalResult]
-    ) -> list[SearchResult]:
-        """Deduplicate and consolidate discrete target evidence into a unified evidence list."""
+    def _merge_results(self, results: list[TargetRetrievalResult]) -> list[SearchResult]:
         merged: list[SearchResult] = []
         seen_ids: set[str] = set()
-
-        for res in results:
-            for item in res.evidence:
+        for result in results:
+            for item in result.evidence:
                 if item.chunk_id not in seen_ids:
                     seen_ids.add(item.chunk_id)
                     merged.append(item)
-
         return merged
 
+
+def _narrow_table_dimension(candidate: SearchResult, requested_dimension: str) -> SearchResult:
+    """Select one requested table column when metadata exposes a dimension map.
+
+    Module 1 keeps the row label and all data cells in ``metadata.values``.
+    Returning the complete row for a request such as ``大型商业银行`` lets a
+    downstream generator accidentally use a neighbouring institution/period.
+    This helper narrows only on an explicit, exact dimension; broad labels such
+    as ``年-季度`` intentionally remain untouched because they represent more
+    than one quarter and must not be guessed.
+    """
+    if candidate.chunk_type != "table" or not requested_dimension:
+        return candidate
+    dimension = _normalize_dimension(requested_dimension)
+    if not dimension or dimension in {"年季度", "季度", "月度", "本年累计", "截至当期"}:
+        return candidate
+    values = [item for item in (candidate.metadata.get("values") or []) if isinstance(item, dict)]
+    matches = []
+    for item in values:
+        header = _normalize_dimension(item.get("header") or item.get("col_header"))
+        if header == dimension:
+            matches.append(item)
+    if len(matches) != 1:
+        return candidate
+
+    selected = matches[0]
+    metadata = dict(candidate.metadata)
+    cell_ref = str(selected.get("cell_ref") or candidate.source.cell_ref)
+    metadata["values"] = [dict(selected)]
+    metadata["cell_ref"] = cell_ref
+    metadata["value"] = str(selected.get("value") or "")
+    if selected.get("value_numeric") is not None:
+        metadata["value_numeric"] = str(selected["value_numeric"])
+    metadata["col_header"] = str(selected.get("header") or selected.get("col_header") or "")
+    metadata["table_cell_selection"] = {
+        "status": "exact_dimension_cell",
+        "requested_dimension": requested_dimension,
+        "original_cell_ref": candidate.source.cell_ref,
+        "selected_cell_ref": str(selected.get("cell_ref") or candidate.source.cell_ref),
+        "selected_value_count": 1,
+        "value_preserved_as_source": True,
+    }
+    # Keep the original row text for backwards-compatible diagnostics while
+    # exposing the authoritative single-cell value through metadata/source.
+    text = candidate.text
+    return SearchResult(
+        chunk_id=candidate.chunk_id,
+        chunk_type=candidate.chunk_type,
+        score=candidate.score,
+        text=text,
+        source=replace(candidate.source, cell_ref=cell_ref),
+        metadata=metadata,
+    )
+
+
+def _normalize_dimension(value: object) -> str:
+    return re.sub(r"[\s\u3000_/\\-]+", "", str(value or "").strip().lower())
 
 multi_target_retriever = MultiTargetRetriever()
 
