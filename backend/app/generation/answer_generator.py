@@ -405,37 +405,55 @@ def generate_answer(
     try:
         generated = (generator or _extractive_generator)(generation_question, evidence_for_gen)
     except Exception as exc:
-        logger.error(f"[AnswerGenerator] 答案生成服务调用异常: {type(exc).__name__}: {exc}", exc_info=True)
-        # Generation-service failure is not evidence failure.  Keep the
-        # grounded retrieval/verification result and fall back to the local
-        # extractive composer so a temporary DeepSeek/network problem does not
-        # turn an otherwise answerable question into a refusal.
-        try:
-            # For choice questions, preserve the deterministic selected option
-            # and citations rather than emitting an arbitrary first snippet.
-            if task_plan and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}:
-                from app.generation.answer_composer import answer_composer
-                generated = answer_composer.compose_fact_choice_answer(
-                    verify_response, task_plan, evidence_for_gen
-                )
-            else:
-                generated = _extractive_generator(generation_question, evidence_for_gen)
-            logger.warning("[AnswerGenerator] DeepSeek 不可用，已切换为本地证据抽取式回答")
-        except Exception as fallback_exc:
-            refusal = build_refusal(
-                question,
-                [f"答案生成服务调用失败: {exc}", f"本地后备生成也失败: {fallback_exc}"],
-                normalized,
-            )
-            refusal["verification"]["sufficiency"] = sufficiency.to_dict()
-            refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
-            return _attach_retrieval_context(
-                refusal,
-                retrieval_status,
-                retrieval_guidance,
-                retrieval_diagnostics,
-            )
+        logger.error(
+            f"[AnswerGenerator] 答案生成服务调用异常: {type(exc).__name__}: {exc}",
+            exc_info=True,
+        )
+        refusal = build_refusal(
+            question,
+            [f"答案生成服务调用失败: {exc}"],
+            normalized,
+            error_code="GENERATION_FAILED",
+        )
+        refusal["verification"]["sufficiency"] = sufficiency.to_dict()
+        refusal["verification"]["evidence_verifier"] = verifier_result.to_dict()
+        return _attach_retrieval_context(
+            refusal,
+            retrieval_status,
+            retrieval_guidance,
+            retrieval_diagnostics,
+        )
     answer_text = str(generated or "").strip()
+
+    # Deterministic module-4 decisions are authoritative. DeepSeek may help
+    # phrase an answer, but it must not replace a verified table value or
+    # option selected by the local evidence verifier. Recompose the canonical
+    # answer after the provider call so the public result always contains the
+    # verified option letter/value.
+    if deterministic_execution is not None:
+        from app.generation.answer_composer import answer_composer
+        if task_type == "TABLE_COMPARE":
+            answer_text = answer_composer.compose_table_compare_answer(
+                deterministic_execution, task_plan, evidence_for_gen
+            )
+        elif task_type == "TABLE_CALCULATION":
+            answer_text = answer_composer.compose_table_calculation_answer(
+                deterministic_execution, task_plan, evidence_for_gen
+            )
+        else:
+            answer_text = answer_composer.compose_table_lookup_answer(
+                deterministic_execution, task_plan, evidence_for_gen
+            )
+    elif (
+        verify_response is not None
+        and task_plan
+        and task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}
+        and verify_response.selected_options
+    ):
+        from app.generation.answer_composer import answer_composer
+        answer_text = answer_composer.compose_fact_choice_answer(
+            verify_response, task_plan, evidence_for_gen
+        )
     if answer_text.upper() == "REFUSE" or answer_text.upper().startswith("REFUSE"):
         # A model-side REFUSE can be overly conservative when deterministic
         # option verification already selected an answer.  Re-run the local
@@ -535,6 +553,25 @@ def generate_answer(
         and getattr(verify_response, "selected_options", None)
         and normalized
     )
+    deterministic_table_answer = bool(
+        task_plan
+        and task_type in {"TABLE_LOOKUP", "TABLE_COMPARE", "TABLE_CALCULATION"}
+        and deterministic_execution is not None
+        and getattr(deterministic_execution, "status", None) == "SUCCESS"
+        and normalized
+    )
+
+    if not verification["passed"] and deterministic_table_answer:
+        risk_tips.append(
+            "数值或选项已由本地表格执行器完成取数、计算与核验；已保留确定性结果。"
+        )
+        verification = {
+            **verification,
+            "passed": True,
+            "status": "PASS_DETERMINISTIC_TABLE",
+            "issues": verification.get("issues", []),
+        }
+        grounding_action = "PASS_DETERMINISTIC_TABLE"
 
     if not verification["passed"] and deterministic_choice_answer:
         risk_tips.append(
@@ -576,6 +613,7 @@ def generate_answer(
         citations=citations,
         verification={
             **verification,
+            **({"table_execution": deterministic_execution.to_dict()} if deterministic_execution is not None else {}),
             **({"option_verification": verify_response.to_dict()} if verify_response is not None else {}),
             "sufficiency": sufficiency.to_dict(),
             "evidence_verifier": verifier_result.to_dict(),

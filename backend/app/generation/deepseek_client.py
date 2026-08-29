@@ -103,6 +103,17 @@ def deepseek_generator(
         "【输出结构】：直接答案 -> 必要说明（简单事实不要生成冗长解释，保持简短；复杂问题再展开） -> 监管依据/数据来源。\n"
         "每个事实结论句末必须标注 [E1] 引用编号。"
     )
+    # Keep the provider response machine-readable. Deterministic module-4
+    # verification remains authoritative, but the model should still emit the
+    # option label explicitly so API clients and evaluators can parse it.
+    system_msg += (
+        "\nSTRICT OUTPUT CONTRACT:\n"
+        "If this is a multiple-choice question, direct_answer MUST begin with "
+        "the uppercase option letter(s), e.g. 'Answer: A' or 'Answer: A,C'. "
+        "Never omit the option letters. If a deterministic verification result "
+        "appears in the user prompt, preserve its verified option, value, and "
+        "calculation exactly; do not override it."
+    )
     payload = {
         "model": model,
         "messages": [

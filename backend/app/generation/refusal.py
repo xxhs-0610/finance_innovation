@@ -68,6 +68,9 @@ def assess_evidence_sufficiency(
 
 
 REASON_CODE_EXPLANATIONS: dict[str, str] = {
+    "GENERATION_FAILED": (
+        "答案生成服务调用失败，当前无法生成经过校验的回答。"
+    ),
     "AMBIGUOUS_QUERY": (
         "您的问题表述不够明确或缺少具体的业务判断条件，请补充具体机构、指标或业务背景后再次提问。"
     ),

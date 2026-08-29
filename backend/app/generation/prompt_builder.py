@@ -38,6 +38,15 @@ SYSTEM_INSTRUCTION = """你是面向银行业监管制度与统计报表的可�
 【引用规则】：每个事实判断和数据结论必须严格对应证据来源编号 [E1]、[E2] 等。"""
 
 
+STRICT_OUTPUT_INSTRUCTION = (
+    "If the question is multiple-choice, direct_answer MUST start with the "
+    "uppercase option letter(s), e.g. 'Answer: A' or 'Answer: A,C'. "
+    "Do not omit the option letters.\n"
+    "If a deterministic verification result is included in the prompt, it is "
+    "authoritative: do not change its verified option, value, or calculation."
+)
+
+
 def build_generation_prompt(
     question: str,
     evidence: list[dict[str, Any]],
@@ -85,6 +94,7 @@ def build_generation_prompt(
         f"【系统角色与指令】：\n{SYSTEM_INSTRUCTION}\n\n"
         f"【用户问题】：\n{str(question or '').strip()}\n\n"
         f"【可信证据包（Evidence）】：\n{evidence_text}\n\n"
+        f"{STRICT_OUTPUT_INSTRUCTION}\n\n"
         "【关键约束】：\n"
         "1. 表格证据如包含“确定性换算”，必须原样优先使用换算后的展示值，不得给原始存储值直接添加百分号。\n"
         "2. 只能依据上述证据回答，严禁使用模型自身记忆补充监管事实，禁止猜数字、猜日期、猜比例、猜机构、猜文件名、猜文号。\n"
@@ -95,4 +105,4 @@ def build_generation_prompt(
     )
 
 
-__all__ = ["SYSTEM_INSTRUCTION", "build_generation_prompt"]
+__all__ = ["SYSTEM_INSTRUCTION", "STRICT_OUTPUT_INSTRUCTION", "build_generation_prompt"]

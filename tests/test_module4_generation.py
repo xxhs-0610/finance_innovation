@@ -105,6 +105,19 @@ class Module4GenerationTest(unittest.TestCase):
         self.assertEqual(unrelated_result["status"], "refused")
         self.assertEqual(empty_result["confidence"], 0.0)
 
+    def test_duration_question_without_numeric_term_is_refused(self) -> None:
+        evidence = [clause_evidence("商业银行应当妥善保存监管统计资料。")]
+
+        result = generate_answer(
+            "监管统计资料按规定必须保存几年？",
+            evidence,
+            generator=lambda _question, _evidence: "按规定保存五年。[E1]",
+        )
+
+        self.assertEqual(result["status"], "refused")
+        self.assertEqual(result["verification"]["evidence_verifier"]["reason_code"], "MISSING_NUMERIC_EVIDENCE")
+        self.assertEqual(result["confidence"], 0.0)
+
     def test_hallucinated_number_is_blocked(self) -> None:
         evidence = [clause_evidence("商业银行资本充足率不得低于8%。")]
 
@@ -215,6 +228,105 @@ class Module4GenerationTest(unittest.TestCase):
         self.assertIn("[E1]", prompt)
         self.assertIn("只能使用给定证据回答", prompt)
         self.assertIn('"status":"answered|refused"', prompt)
+        self.assertIn("direct_answer MUST start with", prompt)
+        self.assertIn("Answer: A,C", prompt)
+
+    def test_verified_table_result_cannot_be_overridden_by_model(self) -> None:
+        question = (
+            "根据《测试表》，甲项减乙项是多少？"
+            "A: 5 B: -5 C: 10 D: -10"
+        )
+        task_plan = {
+            "task_type": "TABLE_CALCULATION",
+            "source": {"file_name": "测试表", "sheet_name": "Sheet1"},
+            "operation": "SUBTRACT",
+            "operands": [
+                {"name": "甲项", "row": "合计", "column": "甲项"},
+                {"name": "乙项", "row": "合计", "column": "乙项"},
+            ],
+            "options": {"A": "5", "B": "-5", "C": "10", "D": "-10"},
+            "need_clarification": False,
+        }
+        evidence = clause_evidence("测试表中甲项为10，乙项为5。")
+        response = {
+            "status": "answerable",
+            "evidence": [evidence],
+            "analysis": {"task_type": "TABLE_CALCULATION", "task_plan": task_plan},
+            "module4_guidance": {"action": "answer", "may_generate_answer": True},
+            "diagnostics": {},
+        }
+
+        from app.schemas.table_execution_schema import (
+            TableExecutionResult,
+            TableOperandResult,
+        )
+
+        verified = TableExecutionResult(
+            status="SUCCESS",
+            task_type="TABLE_CALCULATION",
+            operation="SUBTRACT",
+            operands=[
+                TableOperandResult(name="甲项", value=10, verified=True),
+                TableOperandResult(name="乙项", value=5, verified=True),
+            ],
+            result=-5,
+            matched_option="B",
+            explanation="乙项(5) - 甲项(10) = -5，对应选项 B。",
+        )
+
+        with patch("app.retrieval.table_executor.table_executor.execute", return_value=verified):
+            result = generate_answer(
+                question,
+                response,
+                generator=lambda _question, _evidence: "答案：C，结果为10。[E1]",
+            )
+
+        self.assertEqual(result["status"], "answered")
+        self.assertIn("答案：**B. -5", result["answer"])
+        self.assertNotIn("答案：C", result["answer"])
+        self.assertEqual(result["verification"]["table_execution"]["matched_option"], "B")
+
+    def test_verified_fact_choice_cannot_be_overridden_by_model(self) -> None:
+        question = "根据《测试办法》，正确的是？A.应当备案 B.无需备案"
+        task_plan = {
+            "task_type": "FACT_SINGLE_CHOICE",
+            "source_constraints": {"document_name": "测试办法"},
+            "choice_mode": "SINGLE",
+            "options": [
+                {"label": "A", "claim": "应当备案"},
+                {"label": "B", "claim": "无需备案"},
+            ],
+            "need_clarification": False,
+        }
+        response = {
+            "status": "answerable",
+            "evidence": [clause_evidence("《测试办法》规定，相关事项应当备案。")],
+            "analysis": {"task_type": "FACT_SINGLE_CHOICE", "task_plan": task_plan},
+            "module4_guidance": {"action": "answer", "may_generate_answer": True},
+            "diagnostics": {},
+        }
+
+        from app.schemas.option_verification_schema import OptionVerificationResponse
+
+        verified = OptionVerificationResponse(
+            status="SUCCESS",
+            choice_mode="SINGLE",
+            question_intent_target="CORRECT",
+            selected_options=["A"],
+            explanation="选项 A 与证据中的‘应当备案’一致。",
+        )
+
+        with patch("app.retrieval.option_verifier.option_verifier.verify", return_value=verified):
+            result = generate_answer(
+                question,
+                response,
+                generator=lambda _question, _evidence: "答案：B，无需备案。[E1]",
+            )
+
+        self.assertEqual(result["status"], "answered")
+        self.assertIn("答案：**A**", result["answer"])
+        self.assertNotIn("答案：B", result["answer"])
+        self.assertEqual(result["verification"]["option_verification"]["selected_options"], ["A"])
 
     def test_prompt_includes_deterministic_ratio_conversion(self) -> None:
         evidence = clause_evidence("资本充足率 | 2025Q3 | D44=0.15359")

@@ -158,13 +158,20 @@ class EvidenceVerifier:
         if DURATION_QUESTION_RE.search(question):
             has_concrete_duration = bool(SPECIFIC_DURATION_RE.search(combined_text))
             has_vague_only = bool(VAGUE_QUALIFIER_RE.search(combined_text))
-            if has_vague_only and not has_concrete_duration:
+            # A passage can be topically related (for example, it may say
+            # that records must be retained) without answering the requested
+            # duration.  Do not let wording such as “应当保存” pass through
+            # merely because it is not an exact “按规定保存” phrase.
+            mentions_retention = any(
+                marker in combined_text for marker in ("保存", "存储", "留存", "存档", "保管")
+            )
+            if not has_concrete_duration and (has_vague_only or mentions_retention):
                 return EvidenceVerificationResult(
                     answerable=False,
                     evidence_sufficient=False,
                     need_clarification=False,
                     reason_code="MISSING_NUMERIC_EVIDENCE",
-                    reason="检索证据仅提及按规定期限保存，未包含具体的保存年限数值",
+                    reason="检索证据提及资料保存要求，但未包含具体的保存年限数值",
                     supporting_evidence_ids=[],
                     missing_information=["缺少具体保存年限数值"],
                 )
