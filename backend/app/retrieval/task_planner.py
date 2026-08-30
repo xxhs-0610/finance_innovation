@@ -54,32 +54,28 @@ def extract_choice_options(text: str) -> tuple[str, dict[str, str]]:
     Supports diverse delimiter formats: 'A:', 'A：', 'A.', 'A、', multiline or inline.
     """
     raw = (text or "").strip()
-    pattern = re.compile(
-        r"(?:^|[\n\s，。？！?；;])(?P<label>[A-D])\s*[:：\.、]\s*(?P<content>.*?)(?=(?:[\n\s，。？！?；;][A-D]\s*[:：\.、]|$))",
-        re.DOTALL,
-    )
-    matches = list(pattern.finditer(raw))
-    # Compact user input often starts an option immediately after punctuation
-    # (for example "哪项正确？A. ..."). Keep the labelled-choice requirement
-    # so ordinary capital letters in prose are not treated as options.
-    if len(matches) < 2:
-        compact_pattern = re.compile(
-            r"(?P<label>[A-D])\s*[:：\.、]\s*(?P<content>.*?)(?=(?:\s*[A-D]\s*[:：\.、]|$))",
-            re.DOTALL,
-        )
-        matches = list(compact_pattern.finditer(raw))
-    if len(matches) >= 2:
-        labels = [m.group("label") for m in matches]
-        if "A" in labels:
-            first_match = matches[0]
-            first_a_pos = raw.find(first_match.group("label"), first_match.start())
+    # Locate option markers independently from the whitespace around them.
+    # Real user input may contain ``B.天津C.北京``, ``B天津C北京`` or even
+    # ``A全国合计B天津``.  A delimiter-dependent regex absorbs the next option
+    # into the previous claim and later causes missing operands.  The compact
+    # branch is guarded by a Chinese-character lookahead and the parser still
+    # requires at least two option markers, preventing ordinary prose letters
+    # from being treated as choices.
+    marker_pattern = re.compile(r"(?<![A-Za-z])(?P<label>[A-D])(?![A-Za-z])")
+    markers = list(marker_pattern.finditer(raw))
+    first_a = next((idx for idx, match in enumerate(markers) if match.group("label") == "A"), None)
+    if first_a is not None:
+        option_markers = markers[first_a:]
+        labels = [match.group("label") for match in option_markers]
+        if len(option_markers) >= 2 and len(set(labels)) >= 2:
+            first_a_pos = option_markers[0].start()
             stem = raw[:first_a_pos].rstrip(" \t\n,，:：?？。；;!")
             options: dict[str, str] = {}
-            for m in matches:
-                lbl = m.group("label")
-                content = m.group("content").strip()
+            for idx, marker in enumerate(option_markers):
+                end = option_markers[idx + 1].start() if idx + 1 < len(option_markers) else len(raw)
+                content = raw[marker.end():end].lstrip(" \t\r\n.:：、，,;；)]）")
                 content = content.replace("\\n", " ").strip()
-                options[lbl] = content
+                options[marker.group("label")] = content
             return stem, options
     return raw, {}
 

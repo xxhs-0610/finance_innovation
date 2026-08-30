@@ -132,7 +132,12 @@ class QuestionRouter:
             re.IGNORECASE,
         )
         self.choice_format_re = re.compile(
-            r"(?:^|\n|\s)[A-D]\s*[:：\.、]|\bA\s*[:：]|\bB\s*[:：]|\bC\s*[:：]|\bD\s*[:：]"
+            r"(?:^|\n|\s)[A-D]\s*[:：\.、]"
+            r"|\b[ABCD]\s*[:：]"
+            # Compact input fallback: A全国合计B天津C北京D公司本级.
+            # The route still requires the surrounding task pattern (or more
+            # than one marker) before treating it as a choice question.
+            r"|(?<![A-Za-z0-9])[A-D](?=[\u4e00-\u9fff])"
         )
 
         # 5. Domain Keywords
@@ -204,7 +209,7 @@ class QuestionRouter:
         
         Rule: Multiple targets NEVER equal ambiguity.
         """
-        if self.choice_format_re.search(text):
+        if self.choice_format_re.search(text) or self._has_compact_choice_markers(text):
             return True
         if self.table_calc_re.search(text):
             return True
@@ -217,6 +222,17 @@ class QuestionRouter:
         if len(re.findall(r"“[^”]+”|‘[^’]+’|《[^》]+》", text)) >= 2:
             return True
         return False
+
+    def _has_compact_choice_markers(self, text: str) -> bool:
+        """Detect at least two A-D option labels with any delimiter style.
+
+        Delimiters are intentionally permissive because users may enter
+        ``A.?? B:??``, ``A ??B ??``, ``A??B??`` or numeric
+        options such as ``A.35378.91B.449.65``.  The Latin-letter guards avoid
+        treating the A/B/C/D in ordinary English words as options.
+        """
+        markers = re.findall(r"(?<![A-Za-z])([A-D])(?![A-Za-z])", text or "")
+        return len(markers) >= 2 and len(set(markers)) >= 2
 
     def _is_dangling_demonstrative(self, text: str) -> bool:
         """Check if question has an unresolved demonstrative pronoun missing its concrete referent."""
@@ -363,7 +379,11 @@ class QuestionRouter:
             )
 
         # D4. FACT_SINGLE_CHOICE: Single-choice verification
-        if self.single_choice_re.search(text) or self.choice_format_re.search(text):
+        if (
+            self.single_choice_re.search(text)
+            or self.choice_format_re.search(text)
+            or self._has_compact_choice_markers(text)
+        ):
             return RouteDecision(
                 intent="DOMAIN_QA",
                 task_type="FACT_SINGLE_CHOICE",
@@ -557,7 +577,11 @@ class QuestionRouter:
             task_type = "TABLE_COMPARE"
         elif self.multi_choice_re.search(text) or (self.choice_format_re.search(text) and text.count("；") >= 2):
             task_type = "FACT_MULTI_CHOICE"
-        elif self.single_choice_re.search(text) or self.choice_format_re.search(text):
+        elif (
+            self.single_choice_re.search(text)
+            or self.choice_format_re.search(text)
+            or self._has_compact_choice_markers(text)
+        ):
             task_type = "FACT_SINGLE_CHOICE"
         elif self.table_context_re.search(text) and any(w in text for w in ("是多少", "多少", "数值", "情况", "余额", "口径", "本年累计", "截至当期")):
             task_type = "TABLE_LOOKUP"

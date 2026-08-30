@@ -109,6 +109,27 @@ def extract_operand_value(
         else:
             kv_map, unit = parse_table_chunk_kv(text)
 
+        # Parsed Excel rows also retain authoritative cell values under
+        # metadata.values.  Prefer those values when the compact retrieval
+        # text has collapsed headers (a common source of MISSING_OPERAND for
+        # labels such as 年-季度/季度).
+        metadata = chunk.metadata if isinstance(chunk.metadata, dict) else {}
+        raw_values = metadata.get("values")
+        if isinstance(raw_values, list):
+            kv_map = dict(kv_map or {})
+            for cell in raw_values:
+                if not isinstance(cell, dict):
+                    continue
+                header = str(cell.get("header") or cell.get("col_header") or "").strip()
+                raw_value = cell.get("value_numeric", cell.get("value"))
+                if not header or raw_value in (None, "", "-"):
+                    continue
+                try:
+                    kv_map.setdefault(header, float(str(raw_value).replace(",", "")))
+                except (TypeError, ValueError):
+                    continue
+            unit = unit or str(metadata.get("unit") or "")
+
         if not kv_map:
             # Word / PDF regulatory text numeric fallback (e.g. 注册资本不低于3亿元)
             m_target = re.search(
@@ -137,6 +158,50 @@ def extract_operand_value(
             for target in (column, target_name)
             for alias in table_metric_aliases(target)
         ))
+        # Some quarterly attachments expose generic source labels such as
+        # ``年-季度`` and ``季度`` instead of the concrete headers stored in
+        # the row (for example ``2023年 / 一季度`` ... ``2023年 / 四季度``).
+        # Resolve those semantic labels against the actual keys in this row so
+        # a calculation can use the first and last quarter without requiring
+        # the user to rewrite the question or add answer choices.
+        for resolved_key in _resolve_quarter_column_aliases(column, kv_map):
+            if resolved_key not in search_keys:
+                search_keys.insert(0, resolved_key)
+
+        # A regional/机构 comparison passes the row label as ``target_name``
+        # and the requested measure as ``scope`` (for example row=天津,
+        # scope=合计).  The row chunk contains all columns, so once the row is
+        # confirmed we must read the numeric value from the scope column.  The
+        # stored row label may contain visual spaces (``天 津``), therefore
+        # compare compact forms as well.  This generic branch fixes every
+        # row+column lookup, not only the currently reported cities.
+        if scope:
+            compact = lambda value: re.sub(r"[\s\u3000]+", "", str(value or ""))
+            row_aliases = table_metric_aliases(row or target_name)
+            row_in_chunk = any(
+                compact(alias) and compact(alias) in compact(text)
+                for alias in row_aliases
+            )
+            if row_in_chunk:
+                scope_compact = compact(scope)
+                for key, val in kv_map.items():
+                    if not isinstance(val, (int, float)):
+                        continue
+                    key_compact = compact(key)
+                    if (
+                        key_compact == scope_compact
+                        or key_compact.endswith("/" + scope_compact)
+                        or key_compact.endswith(scope_compact)
+                    ):
+                        return TableOperandResult(
+                            name=target_name,
+                            value=val,
+                            unit=unit,
+                            verified=True,
+                            evidence_id=chunk_id,
+                            row_header=row or target_name or "",
+                            col_header=key,
+                        )
 
         # 1. Exact or composite key matching with scope/column
         for sk in search_keys:
@@ -202,6 +267,62 @@ def extract_operand_value(
         verified=False,
         error=f"未能从证据中提取到 [{target_name}] 的有效数值",
     )
+
+
+def _resolve_quarter_column_aliases(
+    requested_column: str | None,
+    kv_map: Mapping[str, Any],
+) -> list[str]:
+    """Map degraded quarterly labels to concrete headers present in a row.
+
+    The parsed source for some regulatory quarterly spreadsheets contains a
+    complete row such as ``2023年 / 一季度=...`` through ``四季度=...`` while
+    the QA label uses ``年-季度`` for the first value and ``季度`` for the
+    ending value.  These aliases are only resolved when the row itself
+    contains recognisable quarter headers; ordinary exact column matches keep
+    precedence and unrelated tables are unaffected.
+    """
+
+    requested = str(requested_column or "").strip().lower()
+    normalized = re.sub(r"[\s\u3000_/\\\-—–到至]+", "", requested)
+
+    # Some QA exports degrade a pair of concrete headers to placeholders such
+    # as ``年-季度`` → ``季度-季度``.  Resolve these semantically, rather than
+    # adding a one-off rule for a particular question.  Exact concrete quarter
+    # names (一季度/2023年四季度/第2季度) are deliberately left untouched.
+    if re.search(r"(?:一|二|三|四|[1-4])季度", normalized):
+        return []
+    first_aliases = {"年季度", "年度季度", "起始季度", "开始季度", "前一季度"}
+    last_aliases = {"季度", "季度季度", "结束季度", "末季度", "最后季度", "后一季度"}
+    if normalized in first_aliases:
+        alias_position = "first"
+    elif normalized in last_aliases:
+        alias_position = "last"
+    else:
+        # Be tolerant of additional punctuation/words around the generic
+        # placeholder while avoiding arbitrary columns.
+        if "季度" not in normalized:
+            return []
+        alias_position = "first" if ("年" in normalized or "起始" in normalized or "开始" in normalized) else "last"
+
+    quarter_items: list[tuple[int, str]] = []
+    for key in kv_map:
+        text = str(key or "")
+        match = re.search(r"(?:19|20)\d{2}\s*年?\s*/?\s*([一二三四1-4])季度", text)
+        if not match:
+            match = re.search(r"(?:^|[/\s])([一二三四1-4])季度$", text)
+        if not match:
+            continue
+        raw_quarter = match.group(1)
+        quarter_num = {"一": 1, "二": 2, "三": 3, "四": 4}.get(raw_quarter)
+        if quarter_num is None:
+            quarter_num = int(raw_quarter)
+        quarter_items.append((quarter_num, text))
+
+    if not quarter_items:
+        return []
+    quarter_items.sort(key=lambda item: item[0])
+    return [quarter_items[0][1] if alias_position == "first" else quarter_items[-1][1]]
 
 
 def _normalize_retrieval_input(

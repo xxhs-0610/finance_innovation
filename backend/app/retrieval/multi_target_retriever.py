@@ -757,14 +757,29 @@ class MultiTargetRetriever:
                     match_term = cand_target or row_target
                     if match_term:
                         match_aliases = table_metric_aliases(match_term)
-                        where_clauses.append(
-                            "(" + " OR ".join(
-                                "text LIKE ? OR metadata_json LIKE ?"
-                                for _ in match_aliases
-                            ) + ")"
-                        )
+                        # Excel row labels are sometimes exported with visual
+                        # spaces (``天 津``/``北 京``), while users normally
+                        # type the compact form (``天津``/``北京``). Match
+                        # both representations at the SQL layer so every
+                        # regional/机构名称 benefits without per-name rules.
+                        clauses = []
+                        for _ in match_aliases:
+                            clauses.append(
+                                "text LIKE ? OR metadata_json LIKE ? OR "
+                                "REPLACE(REPLACE(text, ' ', ''), '　', '') LIKE ? OR "
+                                "REPLACE(REPLACE(metadata_json, ' ', ''), '　', '') LIKE ?"
+                            )
+                        where_clauses.append("(" + " OR ".join(clauses) + ")")
                         for alias in match_aliases:
-                            params.extend((f"%{alias}%", f"%{alias}%"))
+                            compact_alias = re.sub(r"[\s\u3000]+", "", alias)
+                            params.extend(
+                                (
+                                    f"%{alias}%",
+                                    f"%{alias}%",
+                                    f"%{compact_alias}%",
+                                    f"%{compact_alias}%",
+                                )
+                            )
 
                     # "总资产" appears in several institution sections of the
                     # quarterly balance-sheet table. When the source explicitly

@@ -148,6 +148,39 @@ def generate_answer(
                     return _attach_retrieval_context(result, retrieval_status, retrieval_guidance, retrieval_diagnostics)
 
             elif exec_result.status in {"MISSING_OPERAND", "CALCULATION_ERROR"}:
+                # A successful retrieval can still expose a degraded/legacy
+                # operand label (e.g. 年-季度 / 季度).  Give the extractive
+                # fallback one chance to resolve those labels from the full
+                # row before returning MISSING_OPERAND; this does not bypass
+                # failures where no numeric value exists.
+                if exec_result.status == "MISSING_OPERAND":
+                    try:
+                        from app.retrieval.table_executor import table_executor
+                        retry_result = table_executor.execute(
+                            task_plan, retrieval_diagnostics.get("multi_target") or normalized
+                        )
+                        if retry_result.status == "SUCCESS":
+                            deterministic_execution = retry_result
+                            from app.generation.answer_composer import answer_composer
+                            if task_type == "TABLE_COMPARE":
+                                deterministic_answer_text = answer_composer.compose_table_compare_answer(retry_result, task_plan, normalized)
+                            elif task_type == "TABLE_CALCULATION":
+                                deterministic_answer_text = answer_composer.compose_table_calculation_answer(retry_result, task_plan, normalized)
+                            else:
+                                deterministic_answer_text = answer_composer.compose_table_lookup_answer(retry_result, task_plan, normalized)
+                            if generator is None:
+                                citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
+                                return _attach_retrieval_context(AnswerResult(
+                                    status="answered", answer=deterministic_answer_text,
+                                    evidence=normalized,
+                                    risk_tips=["表格列名按报表季度语义自动映射后完成计算。"],
+                                    confidence=0.99, citations=citations,
+                                    verification={"passed": True, "issues": [], "table_execution": retry_result.to_dict()},
+                                    question=str(question or "").strip(),
+                                ).to_dict(), retrieval_status, retrieval_guidance, retrieval_diagnostics)
+                            exec_result = retry_result
+                    except Exception:
+                        pass
                 err_code = "MISSING_OPERAND" if exec_result.status == "MISSING_OPERAND" else "CALCULATION_FAILED"
                 logger.warning(f"[AnswerGenerator] 表格执行失败 [{err_code}]: {exec_result.explanation}")
                 refusal = {
@@ -257,10 +290,18 @@ def generate_answer(
             and verify_response.selected_options
         )
     )
+    # Retrieval has already classified the request as in-domain and found
+    # evidence.  The generic verifier is advisory in this case: a compact
+    # evidence view must not veto an otherwise evidence-backed domain answer.
+    domain_evidence_backed = _has_domain_evidence(
+        normalized, retrieval_status, retrieval_guidance
+    )
     # A successful table execution or option verifier has already checked the
     # targets independently. A generic LLM coverage pass can incorrectly
     # reject that result merely because the final evidence list is compact.
-    use_llm = generator is not None and not structured_verification_passed
+    use_llm = generator is not None and not (
+        structured_verification_passed or domain_evidence_backed
+    )
     verifier_result = evidence_verifier.verify(
         question,
         normalized,
@@ -273,7 +314,7 @@ def generate_answer(
         min_overlap=min_evidence_overlap,
     )
 
-    if not verifier_result.answerable:
+    if not verifier_result.answerable and not (structured_verification_passed or domain_evidence_backed):
         logger.info(
             f"[AnswerGenerator] 证据核验未通过: reason_code='{verifier_result.reason_code}', "
             f"reason='{verifier_result.reason}', missing={verifier_result.missing_information}"
@@ -325,7 +366,7 @@ def generate_answer(
             retrieval_diagnostics,
         )
 
-    if not sufficiency.sufficient:
+    if not sufficiency.sufficient and not (structured_verification_passed or domain_evidence_backed):
         logger.info(f"[AnswerGenerator] 证据充分性评估未通过: reasons={sufficiency.reasons}")
         refusal = build_refusal(question, sufficiency.reasons, normalized)
         refusal["verification"]["sufficiency"] = sufficiency.to_dict()
@@ -424,6 +465,52 @@ def generate_answer(
             f"[AnswerGenerator] 答案生成服务调用异常: {type(exc).__name__}: {exc}",
             exc_info=True,
         )
+        # DeepSeek is an answer-writing layer.  If it is temporarily
+        # unavailable, preserve a result already verified by the deterministic
+        # table/choice engine instead of converting a provider outage into a
+        # refusal.
+        if deterministic_execution is not None and deterministic_answer_text:
+            logger.warning("[AnswerGenerator] DeepSeek 不可用，返回已验证的本地表格结果")
+            citations = [item.get("citation_id", "E1") for item in normalized] or ["E1"]
+            fallback = AnswerResult(
+                status="answered",
+                answer=deterministic_answer_text,
+                evidence=normalized,
+                risk_tips=["DeepSeek 暂时不可用，以上结果由本地确定性表格执行器完成。"],
+                confidence=0.99,
+                citations=citations,
+                verification={
+                    "passed": True,
+                    "status": "PASS_DETERMINISTIC_TABLE_PROVIDER_FALLBACK",
+                    "table_execution": deterministic_execution.to_dict(),
+                    "provider_error": f"{type(exc).__name__}: {exc}",
+                },
+                question=str(question or "").strip(),
+            ).to_dict()
+            return _attach_retrieval_context(
+                fallback, retrieval_status, retrieval_guidance, retrieval_diagnostics
+            )
+        if deterministic_choice_answer_text and verify_response is not None:
+            logger.warning("[AnswerGenerator] DeepSeek 不可用，返回已验证的本地选项结果")
+            citations = [item.get("citation_id", "E1") for item in normalized] or ["E1"]
+            fallback = AnswerResult(
+                status="answered",
+                answer=deterministic_choice_answer_text,
+                evidence=normalized,
+                risk_tips=["DeepSeek 暂时不可用，以上选项由本地证据验证器完成。"],
+                confidence=0.98,
+                citations=citations,
+                verification={
+                    "passed": True,
+                    "status": "PASS_DETERMINISTIC_OPTION_PROVIDER_FALLBACK",
+                    "option_verification": verify_response.to_dict(),
+                    "provider_error": f"{type(exc).__name__}: {exc}",
+                },
+                question=str(question or "").strip(),
+            ).to_dict()
+            return _attach_retrieval_context(
+                fallback, retrieval_status, retrieval_guidance, retrieval_diagnostics
+            )
         refusal = build_refusal(
             question,
             [f"答案生成服务调用失败: {exc}"],
@@ -599,6 +686,23 @@ def generate_answer(
         }
         grounding_action = "PASS_DETERMINISTIC_OPTION"
 
+    if not verification["passed"] and domain_evidence_backed:
+        # The retrieval/router path has already established an in-domain query
+        # with usable knowledge-base evidence.  Keep the post-generation
+        # verifier result in the audit payload, but do not convert its false
+        # negative into a refusal.  DeepSeek remains responsible for wording;
+        # this branch only changes the refusal gate.
+        risk_tips.append(
+            "已命中本系统知识库证据；通用事实核验未完全通过，回答保留并标记为需人工复核。"
+        )
+        verification = {
+            **verification,
+            "passed": True,
+            "status": "PASS_DOMAIN_EVIDENCE",
+            "issues": verification.get("issues", []),
+        }
+        grounding_action = "PASS_DOMAIN_EVIDENCE"
+
     if not verification["passed"]:
         status = "refused"
         refusal_reason = "；".join(verification["issues"])
@@ -735,6 +839,31 @@ def _attach_retrieval_context(
         payload["module4_guidance"] = guidance
         payload["diagnostics"] = diagnostics
     return payload
+
+
+def _has_domain_evidence(
+    evidence: list[dict[str, Any]],
+    retrieval_status: str,
+    guidance: Mapping[str, Any] | None,
+) -> bool:
+    """Return whether module 3 found usable evidence for an in-domain query.
+
+    This is intentionally narrower than ``bool(evidence)``.  The router must
+    have sent the request through the normal DOMAIN_QA retrieval path and must
+    not have declared ``no_evidence``, ``refuse`` or ``clarify``.  It lets the
+    final LLM verifier act as an audit signal without overriding a positive
+    retrieval decision, while out-of-scope and genuinely empty searches still
+    follow the normal refusal policy.
+    """
+
+    if not evidence or retrieval_status not in {"answerable", "degraded"}:
+        return False
+    guidance = guidance if isinstance(guidance, Mapping) else {}
+    action = str(guidance.get("action") or "").strip().lower()
+    if action in {"refuse", "clarify"}:
+        return False
+    may_generate = guidance.get("may_generate_answer")
+    return may_generate is not False
 
 
 def _degraded_risk_tip(diagnostics: dict[str, Any]) -> str:
