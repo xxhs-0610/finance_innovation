@@ -200,6 +200,30 @@ def find_matching_table_titles(
     try:
         requested_years = set(re.findall(r"(?:19|20)\d{2}", str(file_name or "")))
 
+        # Granularity is part of the source identity.  Treating a monthly
+        # table as a quarterly table produces plausible-looking but invalid
+        # calculations, so explicit requests must never cross this boundary.
+        requested_text = f"{file_name or ''} {sheet_name or ''}"
+        if re.search(r"(?:季度|季报|季末|年-季度)", requested_text):
+            requested_granularity = "quarter"
+        elif re.search(r"(?:月度|月份|月报|月末)", requested_text):
+            requested_granularity = "month"
+        else:
+            requested_granularity = None
+
+        def matches_granularity(title: str | None) -> bool:
+            if not requested_granularity or not title:
+                return True
+            text = str(title)
+            has_quarter = bool(re.search(r"(?:季度|季报|季末|年-季度)", text))
+            has_month = bool(re.search(r"(?:月度|月份|月报|月末)", text))
+            if requested_granularity == "quarter":
+                return has_quarter and not has_month
+            return has_month and not has_quarter
+
+        def filter_granularity(titles: list[str]) -> list[str]:
+            return [title for title in titles if matches_granularity(title)]
+
         def query_titles(pattern: str) -> list[str]:
             """Return titles matching a name while respecting an explicit year."""
             if not pattern:
@@ -211,7 +235,7 @@ def find_matching_table_titles(
                     "WHERE chunk_type='table' AND (title LIKE ? OR table_name LIKE ?)",
                     (like, like),
                 )
-                return [r[0] for r in cursor.fetchall()]
+                return filter_granularity([r[0] for r in cursor.fetchall()])
 
             # A source title can be normalized by module 1 (for example the year
             # is moved into table_name or the row text). Keep only candidates
@@ -231,7 +255,7 @@ def find_matching_table_titles(
                 + ")",
                 [like, like, *year_params],
             )
-            return [r[0] for r in cursor.fetchall()]
+            return filter_granularity([r[0] for r in cursor.fetchall()])
 
         candidates: list[str] = []
 
@@ -248,7 +272,7 @@ def find_matching_table_titles(
                 "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND title LIKE ?",
                 (f"%{family}%",),
             )
-            candidates = [r[0] for r in cursor.fetchall()]
+            candidates = filter_granularity([r[0] for r in cursor.fetchall()])
             wanted = _canonical_title(file_name)
             matches = [t for t in candidates if _canonical_title(t) == wanted]
             if matches:
@@ -298,7 +322,7 @@ def find_matching_table_titles(
                     "SELECT DISTINCT title FROM chunks WHERE chunk_type='table' AND sheet_name LIKE ?",
                     (f"%{clean_sheet}%",),
                 )
-                candidates.extend(r[0] for r in cursor.fetchall())
+                candidates.extend(filter_granularity([r[0] for r in cursor.fetchall()]))
 
         # Preserve insertion order, then prefer titles carrying the explicit
         # source year. A no-year generic title is only acceptable when no year
