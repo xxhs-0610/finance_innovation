@@ -53,6 +53,18 @@ def _normalize_document_name(value: str | None) -> str | None:
     return name.strip() or None
 
 
+def _document_match_key(value: str | None) -> str:
+    """Canonicalize user labels and imported attachment names for comparison."""
+    name = _normalize_document_name(value) or ""
+    name = re.sub(
+        r"^附件(?:\s*[一二三四五六七八九十百0-9]+)?\s*[:：、.．-]*",
+        "",
+        name,
+    )
+    name = re.sub(r"[\s\u3000《》〈〉:：、,，.。_\-—（）()]", "", name)
+    return name.replace("的", "").replace("版", "")
+
+
 def clean_for_match(text: str) -> str:
     """Normalize text for invariant comparison by stripping punctuation and whitespaces."""
     return re.sub(r"[\s\r\n\t，。；：、“”‘’《》（）()\[\]【】\.,:;\"'——\-·]", "", text)
@@ -183,25 +195,36 @@ def detect_contradictions(claim: str, evidence_text: str) -> tuple[bool, str]:
 
     # 1. Number contradiction check with unit normalization
     if c_nums and e_nums:
-        c_set = set(c_nums)
-        e_set = set(e_nums)
-        if not c_set.issubset(e_set):
-            for cn in c_nums:
-                if cn in e_nums:
+        def normalized_numbers(items: list[str]) -> list[tuple[str, float, str]]:
+            normalized = []
+            for raw in items:
+                values = re.findall(r"[\d\.]+", raw)
+                if not values:
                     continue
-                c_val = re.findall(r"[\d\.]+", cn)
-                c_unit = re.sub(r"[\d\.]+", "", cn).strip()
-                if c_val:
-                    cn_norm_val, cn_norm_unit = normalize_num_value(c_val[0], c_unit)
-                    for en in e_nums:
-                        if en in c_nums:
-                            continue
-                        e_val = re.findall(r"[\d\.]+", en)
-                        e_unit = re.sub(r"[\d\.]+", "", en).strip()
-                        if e_val:
-                            en_norm_val, en_norm_unit = normalize_num_value(e_val[0], e_unit)
-                            if cn_norm_unit and en_norm_unit and cn_norm_unit == en_norm_unit and cn_norm_val != en_norm_val:
-                                return True, f"监管原文规定为【{en}】，选项表述为【{cn}】"
+                unit = re.sub(r"[\d\.]+", "", raw).strip()
+                value, normalized_unit = normalize_num_value(values[0], unit)
+                normalized.append((raw, value, normalized_unit))
+            return normalized
+
+        c_normalized = normalized_numbers(c_nums)
+        e_normalized = normalized_numbers(e_nums)
+
+        def has_equivalent(
+            item: tuple[str, float, str],
+            candidates: list[tuple[str, float, str]],
+        ) -> bool:
+            _, value, unit = item
+            return any(
+                unit == other_unit and abs(value - other_value) <= 1e-9
+                for _, other_value, other_unit in candidates
+            )
+
+        unmatched_claim = [item for item in c_normalized if not has_equivalent(item, e_normalized)]
+        unmatched_evidence = [item for item in e_normalized if not has_equivalent(item, c_normalized)]
+        for cn, cn_value, cn_unit in unmatched_claim:
+            for en, en_value, en_unit in unmatched_evidence:
+                if cn_unit and cn_unit == en_unit and cn_value != en_value:
+                    return True, f"监管原文规定为【{en}】，选项表述为【{cn}】"
 
     # 2. Modality inversion check (prohibition vs permission)
     prohibitions = ["不得", "禁止", "严禁", "不准", "不应", "不低于", "不得低于", "不得高于", "不超过"]
@@ -273,7 +296,10 @@ class OptionVerificationEngine:
 
         for opt in option_items:
             task_id = f"OPT_{opt.label}"
-            evidence = task_map.get(task_id) or merged_evidence
+            # Once discrete option tasks exist, an option without evidence must
+            # remain empty. Borrowing merged evidence lets one option use a
+            # different option's chunks and creates false support.
+            evidence = task_map.get(task_id, []) if task_map else merged_evidence
             verified_opt = self.verify_option(
                 opt.label,
                 opt.claim,
@@ -319,9 +345,11 @@ class OptionVerificationEngine:
             item.contradiction_probability = contradiction
             item.ranking_score = ranking
 
-        # Determine winner options based on intent target
+        # Determine winners strictly from tri-state verdicts. Ranking scores
+        # remain diagnostic only and must never promote NOT_ENOUGH_EVIDENCE.
         selected_options: list[str] = []
         explanation_lines: list[str] = []
+        decision_conflict = False
 
         if question_intent_target == "CORRECT":
             supported_opts = [
@@ -334,11 +362,7 @@ class OptionVerificationEngine:
                 if len(supported_opts) == 1:
                     selected_options = supported_opts
                 elif len(supported_opts) > 1:
-                    supported_items = [
-                        opt for opt in verified_options if opt.verdict == "SUPPORTED"
-                    ]
-                    best = max(supported_items, key=lambda x: x.confidence)
-                    selected_options = [best.option]
+                    decision_conflict = True
                 else:
                     # Elimination: ONLY if exactly 1 option remains and all others are explicitly CONTRADICTED
                     if len(contra_opts) == len(verified_options) - 1 and len(verified_options) > 1:
@@ -351,10 +375,10 @@ class OptionVerificationEngine:
                     else:
                         selected_options = []
             else:  # MULTI
-                if supported_opts:
+                if len(supported_opts) == required_count:
                     selected_options = supported_opts
-                else:
-                    selected_options = []
+                elif len(supported_opts) > required_count:
+                    decision_conflict = True
 
         else:  # INCORRECT / NEGATIVE INTENT
             contra_opts = [
@@ -367,11 +391,7 @@ class OptionVerificationEngine:
                 if len(contra_opts) == 1:
                     selected_options = contra_opts
                 elif len(contra_opts) > 1:
-                    best = max(
-                        [opt for opt in verified_options if opt.verdict == "CONTRADICTED"],
-                        key=lambda x: x.confidence,
-                    )
-                    selected_options = [best.option]
+                    decision_conflict = True
                 else:
                     if len(supported_opts) == len(verified_options) - 1 and len(verified_options) > 1:
                         not_sup = [
@@ -383,43 +403,12 @@ class OptionVerificationEngine:
                     else:
                         selected_options = []
             else:
-                if contra_opts:
+                if len(contra_opts) == required_count:
                     selected_options = contra_opts
-                else:
-                    selected_options = []
+                elif len(contra_opts) > required_count:
+                    decision_conflict = True
 
-        # Once the requested document is hit, rank options by the combined
-        # evidence signals.  Single choice returns top 1; multi-choice returns
-        # the number requested by the question. Explicit contradictions are
-        # excluded. This is intentionally independent of the old 0.70 gate.
-        if question_intent_target == "INCORRECT":
-            # For a negative-polarity question, contradiction is the desired
-            # signal.  Prefer explicitly contradicted options; if none were
-            # established, fall back to evidence-backed non-supported options
-            # instead of returning NO_DECISION solely because similarity is
-            # below the old fixed threshold.
-            candidate_pool = [
-                o for o in verified_options
-                if o.evidence_ids and o.verdict == "CONTRADICTED"
-            ]
-            if not candidate_pool:
-                candidate_pool = [
-                    o for o in verified_options
-                    if o.evidence_ids and o.verdict != "SUPPORTED"
-                ]
-        else:
-            candidate_pool = [
-                o for o in verified_options
-                if o.evidence_ids and o.verdict != "CONTRADICTED"
-            ]
-        ranked_candidates = sorted(candidate_pool, key=lambda o: o.ranking_score, reverse=True)
-        if ranked_candidates:
-            if choice_mode == "SINGLE":
-                selected_options = [ranked_candidates[0].option]
-            else:
-                selected_options = [o.option for o in ranked_candidates[:required_count]]
-
-        status = "SUCCESS" if selected_options else "NO_DECISION"
+        status = "CONFLICTING" if decision_conflict else ("SUCCESS" if selected_options else "NO_DECISION")
 
         # Construct explanation
         target_desc = "正确" if question_intent_target == "CORRECT" else "错误/不符合规定"
@@ -488,14 +477,14 @@ class OptionVerificationEngine:
                     for o in verified_options
                 },
                 "decision_policy": (
-                    "SINGLE_TOP1_WITH_EVIDENCE"
+                    "SINGLE_UNIQUE_VERDICT"
                     if choice_mode == "SINGLE"
-                    else f"MULTI_TOP{required_count}_WITH_EVIDENCE"
+                    else f"MULTI_EXACT_{required_count}_VERDICTS"
                 ),
                 "decision_reason": (
-                    "按综合 C_i 排序取最高选项；不使用固定相似度一票否决"
+                    "仅唯一明确三态结论可以获选；证据不足选项不参与排名"
                     if choice_mode == "SINGLE"
-                    else f"按综合 C_i 排序取前 {required_count} 个有证据且未明确矛盾的选项；不使用固定相似度一票否决"
+                    else f"仅在恰有 {required_count} 个明确目标结论时作答；证据不足选项不参与排名"
                 ),
                 "intermediate_verification": interm_verification_dict,
             },
@@ -523,7 +512,7 @@ class OptionVerificationEngine:
                 verdict: VerdictType = "SUPPORTED"
                 ev_ids = [eid for sr in sub_results for eid in sr.evidence_ids if eid]
                 reason = "该选项包含的各项子表述均在指定监管文件中找到明确正向依据支持"
-                confidence = 0.95
+                confidence = min((sr.similarity for sr in sub_results), default=0.0)
             elif any_contra:
                 verdict = "CONTRADICTED"
                 contra_details = [
@@ -531,7 +520,7 @@ class OptionVerificationEngine:
                 ]
                 reason = f"选项中存在与监管规定冲突的表述: {'; '.join(contra_details)}"
                 ev_ids = [eid for sr in sub_results for eid in sr.evidence_ids if eid]
-                confidence = 0.90
+                confidence = max((sr.similarity for sr in sub_results if sr.verdict == "CONTRADICTED"), default=0.0)
             else:
                 verdict = "NOT_ENOUGH_EVIDENCE"
                 unsupported_claims = [
@@ -545,7 +534,7 @@ class OptionVerificationEngine:
                 # rankable by R_i/M_i when strict all-subclaim entailment is
                 # unavailable; clearing this list caused over-refusal.
                 ev_ids = [eid for sr in sub_results for eid in sr.evidence_ids if eid]
-                confidence = 0.50
+                confidence = min((sr.similarity for sr in sub_results), default=0.0)
 
             return OptionVerificationItem(
                 option=option_label,
@@ -564,7 +553,7 @@ class OptionVerificationEngine:
             claim=claim,
             verdict=sr.verdict,
             evidence_ids=sr.evidence_ids,
-            confidence=sr.score if sr.score > 1.0 else 0.95,
+            confidence=max(0.0, min(1.0, sr.similarity)),
             sub_claims=[sr],
             contradiction_detail=sr.contradiction_detail,
             reason=sr.reason,
@@ -589,20 +578,22 @@ class OptionVerificationEngine:
 
         best_ratio = 0.0
         best_chunk = None
-        best_chunk_id = ""
+        best_evidence_ids: list[str] = []
+        best_text = ""
         best_score = 0.0
         best_semantic = False
+        eligible_chunks = []
 
         adapted_list = evidence_adapter.adapt_list(evidence_list)
         for chunk in adapted_list:
-            text = chunk.content
+            content_text = chunk.content
             chunk_id = chunk.evidence_id
             score = chunk.score
             title = chunk.source_title
 
             # Check document filter
             if doc_name:
-                wanted_title = _normalize_document_name(doc_name) or doc_name
+                wanted_title = _document_match_key(doc_name)
                 metadata = getattr(chunk, "metadata", {}) or {}
                 source_candidates = [
                     title,
@@ -613,13 +604,27 @@ class OptionVerificationEngine:
                 ]
                 matched = False
                 for candidate in source_candidates:
-                    actual_title = _normalize_document_name(str(candidate)) or str(candidate)
-                    if wanted_title in actual_title or actual_title in wanted_title:
+                    if not candidate:
+                        continue
+                    actual_title = _document_match_key(str(candidate))
+                    if actual_title and (
+                        wanted_title in actual_title or actual_title in wanted_title
+                    ):
                         matched = True
                         break
                 if not matched:
                     continue
 
+            eligible_chunks.append(chunk)
+
+            text_candidates = [content_text]
+            section_text = str((chunk.location or {}).get("section") or "").strip()
+            if section_text:
+                text_candidates.append(f"{section_text} {content_text}".strip())
+            text = max(
+                text_candidates,
+                key=lambda candidate: compute_sliding_similarity(claim, candidate)[0],
+            )
             ratio, _ = compute_sliding_similarity(claim, text)
             semantic_match = _semantic_table_match(claim, text)
             # Retain the best eligible chunk by text match, then retrieval
@@ -636,16 +641,53 @@ class OptionVerificationEngine:
             ):
                 best_ratio = ratio
                 best_chunk = chunk
-                best_chunk_id = chunk_id
+                best_evidence_ids = [chunk_id]
+                best_text = text
                 best_score = score
                 best_semantic = semantic_match
 
+        # PDF extraction can split one sentence across consecutive short
+        # chunks. Evaluate only contiguous chunks from the same document;
+        # arbitrary evidence from separate locations is never concatenated.
+        grouped_chunks: dict[str, list[tuple[int, Any]]] = {}
+        for chunk in eligible_chunks:
+            match = re.match(r"^(.*?)(\d+)$", chunk.evidence_id)
+            doc_id = str((chunk.metadata or {}).get("doc_id") or "")
+            if not match or not doc_id:
+                continue
+            group_key = f"{doc_id}\x00{match.group(1)}"
+            grouped_chunks.setdefault(group_key, []).append((int(match.group(2)), chunk))
+
+        for group in grouped_chunks.values():
+            ordered = sorted(group, key=lambda pair: pair[0])
+            for window_size in (2, 3):
+                for start in range(len(ordered) - window_size + 1):
+                    window = ordered[start : start + window_size]
+                    indices = [item[0] for item in window]
+                    if any(right != left + 1 for left, right in zip(indices, indices[1:])):
+                        continue
+                    chunks = [item[1] for item in window]
+                    combined_text = "".join(chunk.content.strip() for chunk in chunks)
+                    ratio, _ = compute_sliding_similarity(claim, combined_text)
+                    semantic_match = _semantic_table_match(claim, combined_text)
+                    score = max((_retrieval_score(chunk) for chunk in chunks), default=0.0)
+                    if (
+                        (semantic_match and not best_semantic)
+                        or (semantic_match == best_semantic and ratio > best_ratio)
+                        or (
+                            semantic_match == best_semantic
+                            and ratio == best_ratio
+                            and score > best_score
+                        )
+                    ):
+                        best_ratio = ratio
+                        best_chunk = chunks[0]
+                        best_evidence_ids = [chunk.evidence_id for chunk in chunks]
+                        best_text = combined_text
+                        best_score = score
+                        best_semantic = semantic_match
+
         if best_chunk:
-            best_text = (
-                getattr(best_chunk, "content", None)
-                or getattr(best_chunk, "text", None)
-                or (best_chunk.get("text", "") if isinstance(best_chunk, dict) else "")
-            )
             # 1. Contradiction check on best matching chunk
             if best_ratio >= 0.35:
                 is_contra, contra_msg = detect_contradictions(claim, best_text)
@@ -654,7 +696,7 @@ class OptionVerificationEngine:
                         sub_claim=claim,
                         verdict="CONTRADICTED",
                         score=best_score,
-                        evidence_ids=[best_chunk_id],
+                        evidence_ids=best_evidence_ids,
                         supporting_text=best_text[:120],
                         contradiction_detail=contra_msg,
                         reason=f"存在明确事实矛盾: {contra_msg}",
@@ -664,10 +706,17 @@ class OptionVerificationEngine:
             # may be split from the surrounding sentence; exact substring
             # matching is accepted even when the fuzzy ratio is lower.
             compact_claim = re.sub(r"[\s。；;，,：:（）()]+", "", clean_claim)
-            compact_text = re.sub(r"^[0-9一二三四五六七八九十]+[.、)]?", "", str(best_text or "").strip())
+            compact_text = re.sub(
+                r"^(?:[（(]\s*)?(?:\d+(?:[.．]\d+)*|[一二三四五六七八九十]+)"
+                r"(?:\s*[）)])?[.．、]?\s*",
+                "",
+                str(best_text or "").strip(),
+            )
             compact_text = re.sub(r"[\s。；;，,：:（）()]+", "", compact_text)
+            comparable_claim = compact_claim.replace("以下", "")
+            comparable_text = compact_text.replace("以下", "")
             exact_clause = (
-                (len(compact_text) >= 8 and compact_text in compact_claim)
+                (len(comparable_text) >= 8 and comparable_text in comparable_claim)
                 or (len(clean_for_match(str(best_text or ""))) >= 8
                     and clean_for_match(str(best_text or "")) in clean_for_match(claim))
                 or _semantic_table_match(claim, str(best_text or ""))
@@ -678,7 +727,7 @@ class OptionVerificationEngine:
                     verdict="SUPPORTED",
                     score=best_score,
                     similarity=best_ratio,
-                    evidence_ids=[best_chunk_id],
+                    evidence_ids=best_evidence_ids,
                     supporting_text=best_text[:120],
                     reason=f"与监管条款原文表述高度吻合（文本相似度: {best_ratio * 100:.1f}%）",
                 )
@@ -688,12 +737,10 @@ class OptionVerificationEngine:
             verdict="NOT_ENOUGH_EVIDENCE",
             score=best_ratio,
             similarity=best_ratio,
-            evidence_ids=[best_chunk_id] if best_chunk_id else [],
+            evidence_ids=best_evidence_ids,
             supporting_text=(
                 (
-                    getattr(best_chunk, "content", None)
-                    or getattr(best_chunk, "text", None)
-                    or (best_chunk.get("text", "") if isinstance(best_chunk, dict) else "")
+                    best_text
                 )[:120]
                 if best_chunk is not None
                 else ""
@@ -704,7 +751,9 @@ class OptionVerificationEngine:
     @staticmethod
     def _option_similarity(item: OptionVerificationItem) -> float:
         if item.sub_claims:
-            return max((float(getattr(s, "similarity", s.score)) for s in item.sub_claims), default=0.0)
+            # A paired option is a conjunction: its weakest sub-claim limits
+            # the option rather than its strongest sub-claim lifting it.
+            return min((float(getattr(s, "similarity", s.score)) for s in item.sub_claims), default=0.0)
         return 0.0
 
     def _normalize_retrieval_input(

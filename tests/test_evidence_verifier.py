@@ -67,6 +67,24 @@ class EvidenceVerifierTest(unittest.TestCase):
         self.assertTrue(any("2025" in item for item in res.missing_information))
         self.assertIn(res.reason_code, ALLOWED_REASON_CODES)
 
+    def test_option_values_are_not_treated_as_requested_years(self) -> None:
+        q = (
+            "根据《2023年08月人身险公司经营情况表》，原保险保费收入是多少？\n"
+            "A. 27679.08\nB. 5362.28\nC. 21995.55\nD. 321.25"
+        )
+        evidence = [
+            make_evidence(
+                "2023年08月人身险公司经营情况表，原保险保费收入为27679.08亿元。",
+                title="2023年08月人身险公司经营情况表",
+            )
+        ]
+
+        res = self.verifier.verify(q, evidence, use_llm=False)
+
+        self.assertTrue(res.answerable)
+        self.assertEqual(res.reason_code, "SUFFICIENT")
+        self.assertFalse(any("1995" in item for item in res.missing_information))
+
     def test_specificity_failure_for_vague_duration(self) -> None:
         """SPECIFICITY: Question asks '保存几年', but evidence only says '按规定期限保存'."""
         q = "银行业监管统计资料保存几年？"

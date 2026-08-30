@@ -59,6 +59,15 @@ def extract_choice_options(text: str) -> tuple[str, dict[str, str]]:
         re.DOTALL,
     )
     matches = list(pattern.finditer(raw))
+    # Compact user input often starts an option immediately after punctuation
+    # (for example "哪项正确？A. ..."). Keep the labelled-choice requirement
+    # so ordinary capital letters in prose are not treated as options.
+    if len(matches) < 2:
+        compact_pattern = re.compile(
+            r"(?P<label>[A-D])\s*[:：\.、]\s*(?P<content>.*?)(?=(?:\s*[A-D]\s*[:：\.、]|$))",
+            re.DOTALL,
+        )
+        matches = list(compact_pattern.finditer(raw))
     if len(matches) >= 2:
         labels = [m.group("label") for m in matches]
         if "A" in labels:
@@ -69,6 +78,7 @@ def extract_choice_options(text: str) -> tuple[str, dict[str, str]]:
             for m in matches:
                 lbl = m.group("label")
                 content = m.group("content").strip()
+                content = content.replace("\\n", " ").strip()
                 options[lbl] = content
             return stem, options
     return raw, {}
@@ -119,13 +129,12 @@ class TaskPlanner:
 
         # A question that names an Excel/report source and asks for one value is
         # a table lookup even when it is presented with A-D numeric answers.
-        # Calculation wording still takes precedence: its numeric options are
-        # answer candidates while the operands must be retrieved separately.
-        calculation_signal = re.search(
-            r"(?:两处取数|取数并计算|数值变化|相差|差距|差额|从[“\"‘'].*?[”\"’']到)",
-            raw,
-        )
-        if self._is_numeric_table_lookup(raw, effective_opts) and not calculation_signal:
+        # Explicit comparison/calculation routing takes precedence. Numeric
+        # answer options do not turn a comparison or calculation into lookup.
+        if (
+            norm_task_type not in {"TABLE_COMPARE", "TABLE_CALCULATION"}
+            and self._is_numeric_table_lookup(raw, effective_opts)
+        ):
             norm_task_type = "TABLE_LOOKUP"
 
         # 2. Extract common entities (Strictly without hallucination)

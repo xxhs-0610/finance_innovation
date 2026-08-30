@@ -15,6 +15,7 @@ from app.generation.answer_generator import generate_answer
 from app.generation.deepseek_client import _extract_answer, deepseek_enabled
 from app.generation.prompt_builder import build_generation_prompt
 from app.generation.verifier import extract_numeric_claims, verify_answer
+from app.schemas.task_plan_schema import ChoiceOption, SourceConstraints, TaskPlan
 
 
 def clause_evidence(text: str, *, chunk_id: str = "doc1_clause_0001") -> dict:
@@ -145,6 +146,49 @@ class Module4GenerationTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "refused")
         self.assertIn("答案生成服务调用失败", result["refusal_reason"])
+
+    def test_fact_choice_generator_cannot_override_verified_option(self) -> None:
+        claim_a = "消费金融公司不得吸收公众存款。"
+        plan = TaskPlan(
+            task_type="FACT_SINGLE_CHOICE",
+            question="根据《消费金融公司管理办法》，下列哪项表述正确？",
+            source_constraints=SourceConstraints(document_name="消费金融公司管理办法"),
+            options=[
+                ChoiceOption(label="A", claim=claim_a),
+                ChoiceOption(label="B", claim="消费金融公司可以吸收公众存款。"),
+            ],
+        )
+        evidence_a = clause_evidence(claim_a, chunk_id="consumer_a")
+        evidence_a["source"]["title"] = "消费金融公司管理办法"
+        response = {
+            "status": "answerable",
+            "evidence": [evidence_a],
+            "module4_guidance": {"action": "answer", "may_generate_answer": True},
+            "analysis": {"task_type": plan.task_type, "task_plan": plan.to_dict()},
+            "diagnostics": {
+                "multi_target": {
+                    "task_plan": plan.to_dict(),
+                    "retrieval_results": [
+                        {"task_id": "OPT_A", "evidence": [evidence_a]},
+                        {"task_id": "OPT_B", "evidence": []},
+                    ],
+                    "merged_evidence": [evidence_a],
+                }
+            },
+        }
+
+        result = generate_answer(
+            plan.question,
+            response,
+            generator=lambda _question, _evidence: "答案：B。该选项符合规定。[E1]",
+        )
+
+        self.assertEqual(result["status"], "answered")
+        self.assertEqual(
+            result["verification"]["option_verification"]["selected_options"],
+            ["A"],
+        )
+        self.assertRegex(result["answer"], r"^答案：\*\*A\*\*")
 
     def test_metadata_question_uses_traceable_source_fields(self) -> None:
         evidence = [clause_evidence("商业银行应当建立资本管理制度。")]

@@ -16,6 +16,8 @@ from app.retrieval.multi_target_retriever import (
 )
 from app.retrieval.task_planner import task_planner
 from app.retrieval.hybrid_retriever import HybridRetriever, retrieve
+from app.schemas.chunk_schema import SearchResult, SourceInfo
+from app.schemas.multi_target_retrieval_schema import TargetRetrievalResult
 
 
 class MultiTargetRetrieverTest(unittest.TestCase):
@@ -38,6 +40,27 @@ class MultiTargetRetrieverTest(unittest.TestCase):
             self.retriever.db_path, "2024年9月财产保险公司经营情况表"
         )
         self.assertIn("2024年9月财产险公司经营情况表", titles2)
+
+        # 3. User questions omit the leading zero used by some source titles.
+        titles3 = find_matching_table_titles(
+            self.retriever.db_path, "2023年8月人身险公司经营情况表",
+            "人身保险公司（月度）",
+        )
+        self.assertIn("2023年08月人身险公司经营情况表", titles3)
+
+    def test_table_lookup_accepts_zero_padded_month_title(self):
+        q = (
+            "根据 Excel 附件《2023年8月人身险公司经营情况表》"
+            "（工作表：人身保险公司（月度）），“原保险保费收入”在"
+            "“本年累计/截至当期”口径下的数值是多少？"
+        )
+        plan = self.planner.plan(q, task_type="TABLE_LOOKUP")
+        response = self.retriever.retrieve(q, plan, top_k=5)
+
+        self.assertEqual(response.overall_status, "answerable")
+        self.assertTrue(response.merged_evidence)
+        self.assertIn("27679.08", response.merged_evidence[0].text)
+        self.assertIn("2023年08月", response.merged_evidence[0].source.title)
 
     def test_table_compare_multi_target_retrieval(self):
         """Test TABLE_COMPARE generates 4 discrete tasks and retrieves 4 candidate results."""
@@ -75,6 +98,46 @@ class MultiTargetRetrieverTest(unittest.TestCase):
         self.assertIn("retrieval_results", d)
         self.assertEqual(d["retrieval_tasks"][0]["task_id"], "CAND_A")
         self.assertEqual(d["retrieval_results"][0]["status"], "SUCCESS")
+
+    def test_table_compare_uses_round_robin_dynamic_evidence_budget(self):
+        """Each option gets evidence before a second result from any option."""
+        question = (
+            "根据 Excel 附件《测试表》，以下哪一项数值最高？\n"
+            "A. 指标甲\nB. 指标乙\nC. 指标丙\nD. 指标丁"
+        )
+        plan = self.planner.plan(question, task_type="TABLE_COMPARE")
+
+        class StubRetriever(MultiTargetRetriever):
+            def __init__(self):
+                pass
+
+            def _execute_table_task(self, task, top_k=3):
+                evidence = [
+                    SearchResult(
+                        chunk_id=f"{task.task_id}_{rank}",
+                        chunk_type="table",
+                        score=10.0 - rank,
+                        text=f"{task.target}={rank}",
+                        source=SourceInfo(doc_id="doc", title="测试表"),
+                    )
+                    for rank in range(3)
+                ]
+                return TargetRetrievalResult(
+                    task_id=task.task_id,
+                    target=task.target,
+                    status="SUCCESS",
+                    evidence=evidence[:top_k],
+                )
+
+        response = StubRetriever().retrieve(question, plan, top_k=5)
+
+        self.assertEqual(response.diagnostics["evidence_budget"], 8)
+        self.assertEqual(response.diagnostics["per_task_top_k"], 2)
+        self.assertEqual(len(response.merged_evidence), 8)
+        self.assertEqual(
+            [item.metadata["matched_target_task"] for item in response.merged_evidence[:4]],
+            ["CAND_A", "CAND_B", "CAND_C", "CAND_D"],
+        )
 
     def test_table_calculation_multi_target_retrieval(self):
         """Test TABLE_CALCULATION retrieves both operands distinctly."""

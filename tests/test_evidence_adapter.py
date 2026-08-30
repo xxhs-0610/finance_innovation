@@ -97,6 +97,34 @@ class EvidenceAdapterTest(unittest.TestCase):
         self.assertEqual(ev.location["page"], 10)
         self.assertIn("核心一级资本充足率不得低于5%", ev.content)
 
+    def test_serialized_search_result_preserves_nested_source_fields(self):
+        raw = {
+            "chunk_id": "nested_001",
+            "chunk_type": "clause",
+            "score": 0.88,
+            "text": "第三条 测试条款。",
+            "source": {
+                "doc_id": "doc_nested",
+                "title": "嵌套来源测试规定",
+                "local_path": "data/raw/嵌套来源测试规定.docx",
+                "source_url": "https://example.com/nested",
+                "section_path": ["第一章", "第三条"],
+                "clause_no": "第三条",
+                "issuer": "测试机构",
+                "publish_date": "2026-08-30",
+            },
+            "metadata": {},
+        }
+
+        ev = self.adapter.adapt(raw)
+
+        self.assertEqual(ev.source_title, "嵌套来源测试规定")
+        self.assertEqual(ev.location["section"], "第一章 > 第三条")
+        self.assertEqual(ev.location["article"], "第三条")
+        self.assertEqual(ev.issuer, "测试机构")
+        self.assertEqual(ev.publish_date, "2026-08-30")
+        self.assertEqual(ev.metadata["doc_id"], "doc_nested")
+
     def test_unified_numeric_extraction_across_word_and_excel(self):
         """Verify that extract_operand_value works seamlessly across both Word policy text and Excel table."""
         # 1. Excel Evidence

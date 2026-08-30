@@ -32,7 +32,9 @@ class EvidenceAdapter:
             text = raw_item.text
             score = raw_item.score
             source = raw_item.source
-            metadata = raw_item.metadata or {}
+            metadata = dict(raw_item.metadata or {})
+            if source.doc_id:
+                metadata.setdefault("doc_id", source.doc_id)
             chunk_type = raw_item.chunk_type
             title = source.title
             local_path = source.local_path
@@ -49,7 +51,9 @@ class EvidenceAdapter:
             text = raw_item.text
             score = 1.0
             source = raw_item.source
-            metadata = raw_item.metadata or {}
+            metadata = dict(raw_item.metadata or {})
+            if source.doc_id:
+                metadata.setdefault("doc_id", source.doc_id)
             chunk_type = raw_item.chunk_type
             title = source.title
             local_path = source.local_path
@@ -62,21 +66,25 @@ class EvidenceAdapter:
             issuer = source.issuer
             publish_date = source.publish_date
         elif isinstance(raw_item, dict):
+            source_data = raw_item.get("source") if isinstance(raw_item.get("source"), dict) else {}
             evidence_id = str(raw_item.get("evidence_id") or raw_item.get("chunk_id") or raw_item.get("id") or "E1")
             text = str(raw_item.get("text") or raw_item.get("content") or "")
             score = float(raw_item.get("score") or 1.0)
-            metadata = raw_item.get("metadata") if isinstance(raw_item.get("metadata"), dict) else {}
+            metadata = dict(raw_item.get("metadata")) if isinstance(raw_item.get("metadata"), dict) else {}
+            doc_id = raw_item.get("doc_id") or source_data.get("doc_id")
+            if doc_id:
+                metadata.setdefault("doc_id", str(doc_id))
             chunk_type = raw_item.get("chunk_type") or ("table" if "sheet_name" in raw_item or "table_name" in raw_item else "clause")
-            title = str(raw_item.get("title") or raw_item.get("source_title") or raw_item.get("document_name") or "")
-            local_path = str(raw_item.get("local_path") or "")
-            source_url = str(raw_item.get("source_url") or "")
-            section_path = raw_item.get("section_path") or []
-            clause_no = str(raw_item.get("clause_no") or raw_item.get("article") or "")
-            sheet_name = str(raw_item.get("sheet_name") or raw_item.get("sheet") or "")
-            table_name = str(raw_item.get("table_name") or "")
-            cell_ref = str(raw_item.get("cell_ref") or raw_item.get("cell") or "")
-            issuer = str(raw_item.get("issuer") or "")
-            publish_date = str(raw_item.get("publish_date") or "")
+            title = str(raw_item.get("title") or raw_item.get("source_title") or raw_item.get("document_name") or source_data.get("title") or "")
+            local_path = str(raw_item.get("local_path") or source_data.get("local_path") or "")
+            source_url = str(raw_item.get("source_url") or source_data.get("source_url") or "")
+            section_path = raw_item.get("section_path") or source_data.get("section_path") or []
+            clause_no = str(raw_item.get("clause_no") or raw_item.get("article") or source_data.get("clause_no") or "")
+            sheet_name = str(raw_item.get("sheet_name") or raw_item.get("sheet") or source_data.get("sheet_name") or "")
+            table_name = str(raw_item.get("table_name") or source_data.get("table_name") or "")
+            cell_ref = str(raw_item.get("cell_ref") or raw_item.get("cell") or source_data.get("cell_ref") or "")
+            issuer = str(raw_item.get("issuer") or source_data.get("issuer") or "")
+            publish_date = str(raw_item.get("publish_date") or source_data.get("publish_date") or "")
         else:
             text = str(raw_item)
             return UnifiedEvidence(

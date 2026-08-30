@@ -45,7 +45,8 @@ from app.utils.logger import get_logger
 logger = get_logger("app.generation.evidence_verifier")
 
 # Patterns for Specificity and Coverage Checks
-YEAR_RE = re.compile(r"(?:19|20)\d{2}")
+YEAR_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+OPTION_BLOCK_RE = re.compile(r"(?:^|\s)A\s*[.、:：]\s*", re.I)
 DURATION_QUESTION_RE = re.compile(r"(?:保存|存储|留存|存档|保管).*(?:几年|多少年|期限|多长|多长时间)")
 SPECIFIC_DURATION_RE = re.compile(r"(?<![A-Za-z0-9])\d+(?:\.\d+)?\s*(?:年|个月|天|日)")
 NUMBER_RE = re.compile(
@@ -137,7 +138,11 @@ class EvidenceVerifier:
             )
 
         # Check C: Coverage - Multi-Year Query (e.g. '2024和2025分别是多少')
-        requested_years = YEAR_RE.findall(question)
+        # Options frequently contain four-digit numeric values. Coverage must
+        # use years from the question stem, not substrings such as the 1995 in
+        # an option value like 21995.55.
+        question_stem = OPTION_BLOCK_RE.split(question, maxsplit=1)[0]
+        requested_years = YEAR_RE.findall(question_stem)
         if len(set(requested_years)) >= 2:
             missing_years = [
                 yr for yr in set(requested_years)
@@ -305,7 +310,7 @@ class EvidenceVerifier:
             "你的任务是审查【当前检索证据】是否足以、完整、具体、确定地回答【用户问题】。\n\n"
             "【五项判定维度】:\n"
             "1. RELEVANCE: 证据必须直接对应问题，仅主题相似但未包含具体答案的判为不充分。\n"
-            "2. COVERAGE: 若问题包含多个年份（如2024和2025）、多项指标或多个对象，证据必须全部覆盖；缺少任何一项判为 INSUFFICIENT_COVERAGE。\n"
+            "2. COVERAGE: 若问题包含多个年份（如2024和2025）、计算操作数或比较对象，证据必须覆盖回答所需目标；缺少必要目标判为 INSUFFICIENT_COVERAGE。选择题不要求每个选项具有同等数量证据，已由程序逐项验证并确定唯一选项的结论不得仅因证据数量不均而拒答。\n"
             "3. AUTHORITY: 证据必须来源于知识库官方监管制度、政策规章或统计报表。\n"
             "4. CONSISTENCY: 证据之间不能存在版本冲突、日期冲突、数值矛盾或适用主体冲突。\n"
             "5. SPECIFICITY: 证据必须包含具体结论或数值。例如问'保存几年'，证据只说'按规定保存'无具体数字，必须判为 MISSING_NUMERIC_EVIDENCE。\n\n"

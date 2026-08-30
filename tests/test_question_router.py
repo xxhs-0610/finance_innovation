@@ -138,6 +138,30 @@ class QuestionRouterTest(unittest.TestCase):
             self.assertTrue(decision.need_retrieval)
             self.assertFalse(decision.need_clarification)
 
+    def test_llm_cannot_reject_structured_regulatory_choice_as_out_of_scope(self) -> None:
+        question = (
+            "根据《寿险合同负债评估折现率曲线》，下列哪项表述正确？\n"
+            "A. 20年到40年之间的综合溢价采用线性插值法得到。\n"
+            "B. 其他表述。"
+        )
+        llm_rejection = RouteDecision(
+            intent="OUT_OF_SCOPE",
+            task_type=None,
+            qa_type=None,
+            need_retrieval=False,
+            need_clarification=False,
+            reason="错误地收窄为仅银行业",
+        )
+
+        with patch(
+            "app.router.question_router.deepseek_enabled", return_value=True
+        ), patch.object(self.router, "_llm_classify", return_value=llm_rejection):
+            decision = self.router.route(question)
+
+        self.assertEqual(decision.intent, "DOMAIN_QA")
+        self.assertEqual(decision.task_type, "FACT_SINGLE_CHOICE")
+        self.assertTrue(decision.need_retrieval)
+
     def test_domain_qa_fact_multi_choice(self) -> None:
         queries = [
             "关于《银行函证工作操作指引》，下列哪一组选项中的两项表述均属于该材料内容？",

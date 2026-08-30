@@ -82,7 +82,7 @@ class HybridRetriever:
                 question, analysis.task_plan, top_k=top_k
             )
             evidence = mt_response.merged_evidence
-            status = "answerable" if evidence else "no_evidence"
+            status = mt_response.overall_status
             logger.info(
                 f"[HybridRetriever] 多目标检索完成 | 任务数={len(mt_response.retrieval_tasks)} | "
                 f"成功数={sum(1 for r in mt_response.retrieval_results if r.status == 'SUCCESS')} | "

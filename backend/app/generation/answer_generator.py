@@ -98,6 +98,8 @@ def generate_answer(
     # for the final natural-language answer when an LLM generator is enabled.
     generation_question = str(question or "").strip()
     deterministic_execution = None
+    deterministic_answer_text = ""
+    deterministic_choice_answer_text = ""
     verify_response = None
 
     if task_plan and task_type in {"TABLE_LOOKUP", "TABLE_COMPARE", "TABLE_CALCULATION"}:
@@ -119,6 +121,7 @@ def generate_answer(
                     ans_text = answer_composer.compose_table_lookup_answer(exec_result, task_plan, normalized)
 
                 deterministic_execution = exec_result
+                deterministic_answer_text = ans_text
                 generation_question = (
                     f"{generation_question}\n\n"
                     "【程序确定性核验结果】请将以下已核验事实组织成最终回答，不能修改数值或选项：\n"
@@ -191,6 +194,7 @@ def generate_answer(
                 ans_text = answer_composer.compose_fact_choice_answer(
                     verify_response, task_plan, normalized
                 )
+                deterministic_choice_answer_text = ans_text
 
                 if generator is None:
                     citations = [normalized[0].get("citation_id", "E1")] if normalized else ["E1"]
@@ -245,7 +249,18 @@ def generate_answer(
     # =========================================================================
     # Step 1: Pre-Generation Evidence Verifier (5 Core Dimensions)
     # =========================================================================
-    use_llm = generator is not None
+    structured_verification_passed = bool(
+        deterministic_execution is not None
+        or (
+            verify_response is not None
+            and verify_response.status == "SUCCESS"
+            and verify_response.selected_options
+        )
+    )
+    # A successful table execution or option verifier has already checked the
+    # targets independently. A generic LLM coverage pass can incorrectly
+    # reject that result merely because the final evidence list is compact.
+    use_llm = generator is not None and not structured_verification_passed
     verifier_result = evidence_verifier.verify(
         question,
         normalized,
@@ -424,7 +439,6 @@ def generate_answer(
             retrieval_diagnostics,
         )
     answer_text = str(generated or "").strip()
-
     # Deterministic module-4 decisions are authoritative. DeepSeek may help
     # phrase an answer, but it must not replace a verified table value or
     # option selected by the local evidence verifier. Recompose the canonical

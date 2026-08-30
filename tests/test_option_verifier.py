@@ -21,6 +21,11 @@ from app.retrieval.task_planner import task_planner
 from app.retrieval.multi_target_retriever import multi_target_retriever
 from app.services.rag_service import RAGService
 from app.schemas.task_plan_schema import ChoiceOption, SourceConstraints, TaskPlan
+from app.schemas.chunk_schema import SearchResult, SourceInfo
+from app.schemas.multi_target_retrieval_schema import (
+    MultiTargetRetrievalResponse,
+    TargetRetrievalResult,
+)
 
 
 class OptionVerifierTest(unittest.TestCase):
@@ -94,6 +99,227 @@ class OptionVerifierTest(unittest.TestCase):
         self.assertEqual(opt_c.verdict, "SUPPORTED")
         self.assertEqual(len(opt_c.sub_claims), 2)
         self.assertTrue(all(sc.verdict == "SUPPORTED" for sc in opt_c.sub_claims))
+
+    def test_all_nei_options_do_not_get_promoted_by_ranking(self):
+        plan = TaskPlan(
+            task_type="FACT_SINGLE_CHOICE",
+            question="根据《目标规定》，下列哪项表述正确？",
+            source_constraints=SourceConstraints(document_name="目标规定"),
+            options=[
+                ChoiceOption(label="A", claim="甲机构必须在十日内报告。"),
+                ChoiceOption(label="B", claim="乙机构可以免于报告。"),
+                ChoiceOption(label="C", claim="丙机构应当每月报告。"),
+                ChoiceOption(label="D", claim="丁机构不得提交报告。"),
+            ],
+        )
+        results = []
+        merged = []
+        for label in "ABCD":
+            evidence = SearchResult(
+                chunk_id=f"target_{label}",
+                chunk_type="clause",
+                score=99.0,
+                text="本条规定适用于风险管理制度和内部控制流程。",
+                source=SourceInfo(doc_id="target", title="目标规定"),
+            )
+            merged.append(evidence)
+            results.append(
+                TargetRetrievalResult(
+                    task_id=f"OPT_{label}",
+                    target=label,
+                    evidence=[evidence],
+                )
+            )
+
+        response = MultiTargetRetrievalResponse(
+            query=plan.question,
+            task_type=plan.task_type,
+            task_plan=plan,
+            retrieval_results=results,
+            merged_evidence=merged,
+        )
+
+        verified = self.verifier.verify(plan, response)
+
+        self.assertEqual(verified.status, "NO_DECISION")
+        self.assertEqual(verified.selected_options, [])
+        self.assertTrue(
+            all(item.verdict == "NOT_ENOUGH_EVIDENCE" for item in verified.options_verification)
+        )
+
+    def test_empty_source_metadata_cannot_match_requested_document(self):
+        claim = "寿险合同负债评估采用基础利率曲线加综合溢价形成折现率曲线。"
+        evidence = SearchResult(
+            chunk_id="wrong_doc_exact",
+            chunk_type="clause",
+            score=100.0,
+            text=claim,
+            source=SourceInfo(doc_id="other_doc", title=""),
+            metadata={},
+        )
+
+        result = self.verifier.verify_single_claim(
+            claim,
+            [evidence],
+            doc_name="寿险合同负债评估折现率曲线",
+        )
+
+        self.assertEqual(result.verdict, "NOT_ENOUGH_EVIDENCE")
+        self.assertEqual(result.evidence_ids, [])
+
+    def test_consecutive_chunks_can_jointly_support_one_claim(self):
+        claim = "计算现金流现值所采用的折现率曲线由基础利率曲线加综合溢价形成。"
+        source = SourceInfo(doc_id="life_rate", title="寿险合同负债评估折现率曲线")
+        evidence = [
+            SearchResult(
+                chunk_id="life_rate_clause_0004",
+                chunk_type="clause",
+                score=0.8,
+                text="计算现金流现值所采用的折现",
+                source=source,
+            ),
+            SearchResult(
+                chunk_id="life_rate_clause_0005",
+                chunk_type="clause",
+                score=0.7,
+                text="率曲线由基础利率曲线加综合溢价形成。",
+                source=source,
+            ),
+        ]
+
+        result = self.verifier.verify_single_claim(
+            claim,
+            evidence,
+            doc_name="寿险合同负债评估折现率曲线",
+        )
+
+        self.assertEqual(result.verdict, "SUPPORTED")
+        self.assertEqual(
+            result.evidence_ids,
+            ["life_rate_clause_0004", "life_rate_clause_0005"],
+        )
+
+    def test_numbered_heading_and_section_path_are_valid_evidence(self):
+        heading = SearchResult(
+            chunk_id="license_clause_0090",
+            chunk_type="clause",
+            score=0.8,
+            text="1.2 中资商业银行法人机构开业核准",
+            source=SourceInfo(
+                doc_id="license",
+                title="中资商业银行行政许可事项申请材料目录及格式要求（2023年版）",
+                section_path=["一、机构设立"],
+            ),
+        )
+        split_section = SearchResult(
+            chunk_id="life_rate_clause_0037",
+            chunk_type="clause",
+            score=0.8,
+            text="值法得到：",
+            source=SourceInfo(
+                doc_id="life_rate",
+                title="寿险合同负债评估折现率曲线",
+                local_path="寿险合同负债评估折现率曲线.pdf",
+                section_path=["（三）20 年到 40 年之间的综合溢价采用以下线性插"],
+            ),
+        )
+
+        heading_result = self.verifier.verify_single_claim(
+            "中资商业银行法人机构开业核准属于机构设立类行政许可事项。",
+            [heading],
+            doc_name="中资商业银行行政许可事项申请材料目录及格式要求（2023年版）",
+        )
+        section_result = self.verifier.verify_single_claim(
+            "20年到40年之间的综合溢价采用线性插值法得到。",
+            [split_section],
+            doc_name="寿险合同负债评估折现率曲线",
+        )
+
+        self.assertEqual(heading_result.verdict, "SUPPORTED")
+        self.assertEqual(section_result.verdict, "SUPPORTED", msg=str(section_result.to_dict()))
+
+    def test_missing_option_task_does_not_borrow_merged_evidence(self):
+        claim = "消费金融公司不得吸收公众存款。"
+        plan = TaskPlan(
+            task_type="FACT_SINGLE_CHOICE",
+            question="根据《消费金融公司管理办法》，下列哪项表述正确？",
+            source_constraints=SourceConstraints(document_name="消费金融公司管理办法"),
+            options=[
+                ChoiceOption(label="A", claim=claim),
+                ChoiceOption(label="B", claim=claim),
+            ],
+        )
+        evidence = SearchResult(
+            chunk_id="consumer_clause",
+            chunk_type="clause",
+            score=100.0,
+            text=claim,
+            source=SourceInfo(doc_id="consumer", title="消费金融公司管理办法"),
+        )
+        response = MultiTargetRetrievalResponse(
+            query=plan.question,
+            task_type=plan.task_type,
+            task_plan=plan,
+            retrieval_results=[
+                TargetRetrievalResult(task_id="OPT_A", target=claim, evidence=[evidence])
+            ],
+            merged_evidence=[evidence],
+        )
+
+        verified = self.verifier.verify(plan, response)
+
+        self.assertEqual(verified.status, "SUCCESS")
+        self.assertEqual(verified.selected_options, ["A"])
+        option_b = next(item for item in verified.options_verification if item.option == "B")
+        self.assertEqual(option_b.verdict, "NOT_ENOUGH_EVIDENCE")
+        self.assertEqual(option_b.evidence_ids, [])
+
+    def test_real_index_q201_isolated_to_requested_document(self):
+        question = (
+            "根据《寿险合同负债评估折现率曲线》，下列哪项表述正确？\n"
+            "A. 寿险合同负债评估中计算现金流现值所采用的折现率曲线由基础利率曲线加综合溢价形成。\n"
+            "B. 列入名单的保险集团应当按照《保险公司偿付能力监管规则第19号：保险集团》有关规定编报保险集团偿付能力报告。\n"
+            "C. 其他符合保险集团定义的保险集团暂不编报偿付能力报告。\n"
+            "D. 中国人民保险集团股份有限公司属于应当编制保险集团偿付能力报告的保险控股型集团。"
+        )
+        plan = self.planner.plan(question)
+        retrieval = self.retriever.retrieve(question, plan)
+
+        retrieved_doc_ids = {
+            item.source.doc_id
+            for result in retrieval.retrieval_results
+            for item in result.evidence
+        }
+        verified = self.verifier.verify(plan, retrieval)
+
+        self.assertTrue(retrieved_doc_ids)
+        self.assertEqual(retrieved_doc_ids, {"nfra_att_460"})
+        self.assertEqual(
+            verified.status,
+            "SUCCESS",
+            msg=str(
+                {
+                    "retrieval": {
+                        result.task_id: [item.chunk_id for item in result.evidence]
+                        for result in retrieval.retrieval_results
+                    },
+                    "verification": [
+                        item.to_dict() for item in verified.options_verification
+                    ],
+                }
+            ),
+        )
+        self.assertEqual(verified.selected_options, ["A"])
+
+    def test_plain_attachment_prefix_and_truncated_version_resolve(self):
+        from app.retrieval.multi_target_retriever import _preferred_document_ids
+
+        document_name = "中资商业银行行政许可事项申请材料目录及格式要求（2023年版）"
+
+        self.assertEqual(
+            _preferred_document_ids(self.retriever.db_path, document_name),
+            ["nfra_att_430"],
+        )
 
     def test_rag_service_end_to_end_single_choice(self):
         """Test full RAGService.ask flow for fact single choice question."""

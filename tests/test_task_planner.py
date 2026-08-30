@@ -90,6 +90,16 @@ class TaskPlannerTest(unittest.TestCase):
         self.assertEqual(d["candidates"][3], {"label": "D", "target": "银行存款"})
         self.assertFalse(d["need_clarification"])
 
+    def test_numeric_options_do_not_override_explicit_table_compare(self):
+        q = (
+            "根据 Excel 附件《测试表》，以下哪一项数值最高？"
+            "A. 10 B. 20 C. 30 D. 40"
+        )
+        plan = self.planner.plan(q, task_type="TABLE_COMPARE")
+
+        self.assertEqual(plan.task_type, "TABLE_COMPARE")
+        self.assertEqual([item.target for item in plan.candidates], ["10", "20", "30", "40"])
+
     def test_prompt3_example3_table_calculation(self):
         """Test TABLE_CALCULATION operands and subtraction expression."""
         q = "需要对同一 Excel 附件做两处取数并计算。根据《2023年12月全国各地区原保险保费收入情况表》，“全国合计”从“合计”到“健康险”的数值变化约为多少？A: 42212.17 B: -42212.17 C: -46433.39 D: -37990.95"
@@ -131,7 +141,9 @@ class TaskPlannerTest(unittest.TestCase):
         self.assertEqual(d["task_type"], "FACT_MULTI_CHOICE")
         self.assertEqual(d["source_constraints"]["document_name"], "银行函证工作操作指引")
         self.assertEqual(d["choice_mode"], "MULTI")
-        self.assertEqual(d["required_correct_count"], 2)
+        # The two sub-statements belong to one option group, so the expected
+        # answer is one option label rather than two independently selected labels.
+        self.assertEqual(d["required_correct_count"], 1)
         self.assertEqual(len(d["options"]), 4)
         self.assertEqual(d["options"][0]["label"], "A")
         self.assertEqual(d["options"][0]["sub_claims"], ["函证指引内容1。", "消费贷款内容2。"])

@@ -19,8 +19,8 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any, Sequence
 from dataclasses import replace
+from typing import Any, Sequence
 
 from app.indexing.index_reader import KnowledgeBaseReader
 from app.schemas.chunk_schema import SearchResult, SourceInfo
@@ -34,6 +34,18 @@ from app.utils.logger import get_logger
 from app.utils.paths import resolve_path
 
 logger = get_logger("app.retrieval.multi_target")
+
+MULTI_TARGET_EVIDENCE_PER_TASK = 2
+YEAR_TOKEN_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+
+
+def _normalize_month_tokens(value: str) -> str:
+    """Canonicalize Chinese month labels so ``8月`` and ``08月`` match."""
+    return re.sub(
+        r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月",
+        lambda match: f"{match.group(1)}年{int(match.group(2))}月",
+        value,
+    )
 
 
 def _normalize_document_name(value: str | None) -> str | None:
@@ -51,6 +63,7 @@ def _canonical_title(value: str | None) -> str:
     if not value:
         return ""
     name = _normalize_document_name(value) or ""
+    name = _normalize_month_tokens(name)
     name = re.sub(r"[\s\u3000\-_—]+", "", name)
     name = name.replace("（", "(").replace("）", ")")
     # Year may appear at either end: 2023年Foo（季度） vs Foo(季度)(2023年)
@@ -58,6 +71,20 @@ def _canonical_title(value: str | None) -> str:
     name = re.sub(r"(?:19|20)\d{2}年", "", name)
     name = name.replace("(", "").replace(")", "")
     return name + "".join(years)
+
+
+def _document_match_key(value: str | None) -> str:
+    """Normalize attachment labels without weakening the eventual doc_id filter."""
+    name = _canonical_title(value)
+    name = re.sub(
+        r"^附件(?:\s*[一二三四五六七八九十百0-9]+)?\s*[:：、.．-]*",
+        "",
+        name,
+    )
+    name = re.sub(r"[《》〈〉:：、,，.。]", "", name)
+    # Source attachment titles often include a structural 的 that question
+    # labels omit, e.g. "负债评估的折现率曲线" vs "负债评估折现率曲线".
+    return name.replace("的", "").replace("版", "")
 
 
 def _document_filter_candidates(document_name: str | None) -> list[str]:
@@ -100,7 +127,7 @@ def _find_document_ids(db_path: Path | str, document_name: str | None) -> list[s
         resolve_path("data/parsed/meta/doc_meta.jsonl"),
         resolve_path("data/parsed/meta/generated_manifest.jsonl"),
     ]
-    wanted = _canonical_title(document_name)
+    wanted = _document_match_key(document_name)
     manifest_scores: dict[str, int] = {}
     for manifest in manifest_candidates:
         if not manifest.exists():
@@ -120,7 +147,7 @@ def _find_document_ids(db_path: Path | str, document_name: str | None) -> list[s
                 for idx, value in enumerate(fields):
                     if not value:
                         continue
-                    candidate = _canonical_title(str(value))
+                    candidate = _document_match_key(str(value))
                     if not wanted or not candidate:
                         continue
                     if candidate == wanted:
@@ -198,7 +225,7 @@ def find_matching_table_titles(
     conn = sqlite3.connect(p)
     cursor = conn.cursor()
     try:
-        requested_years = set(re.findall(r"(?:19|20)\d{2}", str(file_name or "")))
+        requested_years = set(YEAR_TOKEN_RE.findall(str(file_name or "")))
 
         # Granularity is part of the source identity.  Treating a monthly
         # table as a quarterly table produces plausible-looking but invalid
@@ -206,7 +233,10 @@ def find_matching_table_titles(
         requested_text = f"{file_name or ''} {sheet_name or ''}"
         if re.search(r"(?:季度|季报|季末|年-季度)", requested_text):
             requested_granularity = "quarter"
-        elif re.search(r"(?:月度|月份|月报|月末)", requested_text):
+        elif re.search(
+            r"(?:(?:19|20)\d{2}年)?(?:0?[1-9]|1[0-2])月|(?:月度|月份|月报|月末)",
+            requested_text,
+        ):
             requested_granularity = "month"
         else:
             requested_granularity = None
@@ -216,7 +246,12 @@ def find_matching_table_titles(
                 return True
             text = str(title)
             has_quarter = bool(re.search(r"(?:季度|季报|季末|年-季度)", text))
-            has_month = bool(re.search(r"(?:月度|月份|月报|月末)", text))
+            has_month = bool(
+                re.search(
+                    r"(?:(?:19|20)\d{2}年)?(?:0?[1-9]|1[0-2])月|(?:月度|月份|月报|月末)",
+                    text,
+                )
+            )
             if requested_granularity == "quarter":
                 return has_quarter and not has_month
             return has_month and not has_quarter
@@ -297,6 +332,22 @@ def find_matching_table_titles(
                 file_name.replace("情况表", "情况"),
                 file_name.replace("情况", "情况表"),
             ]
+            month_match = re.search(
+                r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月", file_name
+            )
+            if month_match:
+                year, month = month_match.groups()
+                month_span = month_match.span()
+                variants.extend(
+                    [
+                        file_name[: month_span[0]]
+                        + f"{year}年{int(month)}月"
+                        + file_name[month_span[1] :],
+                        file_name[: month_span[0]]
+                        + f"{year}年{int(month):02d}月"
+                        + file_name[month_span[1] :],
+                    ]
+                )
             m_year = re.search(r"^(?:19|20)\d{2}年?", file_name)
             if m_year:
                 no_year = file_name[len(m_year.group(0)) :].strip()
@@ -512,17 +563,30 @@ class MultiTargetRetriever:
             f"[MultiTargetRetriever] 启动多目标检索 | task_type={task_plan.task_type} | 任务总数={len(tasks)}"
         )
 
+        per_task_k = self._per_task_top_k(task_plan.task_type, tasks, top_k)
         for task in tasks:
             if task.task_type in {"TABLE_COMPARE", "TABLE_CALCULATION", "TABLE_LOOKUP"}:
-                res = self._execute_table_task(task, top_k=max(top_k, 3))
+                res = self._execute_table_task(task, top_k=per_task_k)
             elif task.task_type in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}:
-                res = self._execute_fact_choice_task(task, top_k=max(top_k, 3))
+                res = self._execute_fact_choice_task(task, top_k=per_task_k)
             else:
                 res = self._execute_direct_fact_task(task, top_k=top_k)
             results.append(res)
 
-        merged_evidence = self._merge_results(results)
-        overall_status = "answerable" if merged_evidence else "no_evidence"
+        evidence_budget = self._evidence_budget(task_plan.task_type, results, top_k)
+        merged_evidence = self._merge_results(results, budget=evidence_budget)
+        successful_task_ids = [r.task_id for r in results if r.status == "SUCCESS" and r.evidence]
+        requires_full_target_coverage = task_plan.task_type in {
+            "TABLE_COMPARE",
+            "TABLE_CALCULATION",
+        }
+        overall_status = "no_evidence" if not merged_evidence else "answerable"
+        if (
+            overall_status == "answerable"
+            and requires_full_target_coverage
+            and len(successful_task_ids) < len(tasks)
+        ):
+            overall_status = "degraded"
 
         response = MultiTargetRetrievalResponse(
             query=question,
@@ -536,9 +600,46 @@ class MultiTargetRetriever:
                 "task_count": len(tasks),
                 "success_count": sum(1 for r in results if r.status == "SUCCESS"),
                 "merged_evidence_count": len(merged_evidence),
+                "requested_top_k": top_k,
+                "per_task_top_k": per_task_k,
+                "evidence_budget": evidence_budget,
+                "covered_task_ids": successful_task_ids,
+                "missing_task_ids": [
+                    task.task_id for task in tasks if task.task_id not in successful_task_ids
+                ],
+                "requires_full_target_coverage": requires_full_target_coverage,
             },
         )
         return response
+
+    @staticmethod
+    def _per_task_top_k(
+        task_type: str,
+        tasks: Sequence[TargetRetrievalTask],
+        requested_top_k: int,
+    ) -> int:
+        if task_type == "TABLE_LOOKUP" or len(tasks) <= 1:
+            return max(requested_top_k, 3)
+        if task_type == "FACT_MULTI_CHOICE":
+            max_sub_targets = max((len(task.sub_targets) for task in tasks), default=1)
+            return max(MULTI_TARGET_EVIDENCE_PER_TASK, max_sub_targets)
+        return MULTI_TARGET_EVIDENCE_PER_TASK
+
+    @staticmethod
+    def _evidence_budget(
+        task_type: str,
+        results: Sequence[TargetRetrievalResult],
+        requested_top_k: int,
+    ) -> int:
+        successful_count = sum(1 for result in results if result.status == "SUCCESS" and result.evidence)
+        if task_type in {
+            "TABLE_COMPARE",
+            "TABLE_CALCULATION",
+            "FACT_SINGLE_CHOICE",
+            "FACT_MULTI_CHOICE",
+        }:
+            return max(requested_top_k, successful_count * MULTI_TARGET_EVIDENCE_PER_TASK)
+        return max(requested_top_k, successful_count)
 
     def _execute_table_task(
         self, task: TargetRetrievalTask, top_k: int = 3
@@ -586,6 +687,52 @@ class MultiTargetRetriever:
                         clean_sheet = sheet_name.replace("（月度）", "").replace("(月度)", "").replace("（季度）", "").replace("(季度)", "").strip()
                         where_clauses.append("sheet_name LIKE ?")
                         params.append(f"%{clean_sheet}%")
+
+                    month_match = re.search(
+                        r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月",
+                        file_name or "",
+                    )
+                    quarter_match = re.search(
+                        r"((?:19|20)\d{2})年(?:第)?([1-4一二三四])季度",
+                        file_name or "",
+                    )
+                    if month_match:
+                        year, month = month_match.groups()
+                        month_number = int(month)
+                        period = f"{year}-{month_number:02d}"
+                        where_clauses.append(
+                            "(metadata_json LIKE ? OR text LIKE ? OR text LIKE ? "
+                            "OR title LIKE ? OR title LIKE ?)"
+                        )
+                        params.extend(
+                            [
+                                f'%"period": "{period}%',
+                                f"%{year}年{month_number}月%",
+                                f"%{year}年{month_number:02d}月%",
+                                f"%{year}年{month_number}月%",
+                                f"%{year}年{month_number:02d}月%",
+                            ]
+                        )
+                    elif quarter_match:
+                        year, quarter = quarter_match.groups()
+                        quarter_num = {
+                            "一": "1", "二": "2", "三": "3", "四": "4",
+                        }.get(quarter, quarter)
+                        quarter_cn = {
+                            "1": "一", "2": "二", "3": "三", "4": "四",
+                        }[quarter_num]
+                        where_clauses.append(
+                            "(metadata_json LIKE ? OR text LIKE ? OR text LIKE ? OR title LIKE ? OR title LIKE ?)"
+                        )
+                        params.extend(
+                            [
+                                f'%"period": "{year}-Q{quarter_num}%',
+                                f"%{year}年{quarter_num}季度%",
+                                f"%{year}年{quarter_cn}季度%",
+                                f"%{year}年{quarter_num}季度%",
+                                f"%{year}年{quarter_cn}季度%",
+                            ]
+                        )
 
                     # Match specific candidate or operand row
                     match_term = cand_target or row_target
@@ -693,6 +840,8 @@ class MultiTargetRetriever:
         if doc_ids:
             filters = {"doc_id": doc_ids[0]}
 
+        evidence: list[SearchResult] = []
+
         # If option contains multiple sub-claims (FACT_MULTI_CHOICE paired claims)
         if task.sub_targets and len(task.sub_targets) > 1:
             for sub_claim in task.sub_targets:
@@ -717,16 +866,6 @@ class MultiTargetRetriever:
                     # Put structured rows first so the per-subclaim evidence
                     # budget does not discard the decisive table value.
                     sc_res = list(table_res) + [x for x in sc_res if x.chunk_id not in seen]
-                # KB title metadata can be truncated (for example, only the
-                # issuing notice prefix). Retry without the title filter when
-                # the requested document is known to exist by path/doc family.
-                if not sc_res and doc_name:
-                    sc_res = self.reader.search(
-                        sub_claim,
-                        top_k=2,
-                        filters=({"doc_id": doc_ids[0]} if doc_ids else {}),
-                        rerank=True,
-                    )
                 for sr in sc_res[:4]:
                     if not any(e.chunk_id == sr.chunk_id for e in evidence):
                         sr.metadata["matched_target_task"] = task.task_id
@@ -739,13 +878,6 @@ class MultiTargetRetriever:
                 filters=filters,
                 rerank=True,
             )
-            if not claim_res and doc_name:
-                claim_res = self.reader.search(
-                    task.target,
-                    top_k=top_k,
-                    filters=({"doc_id": doc_ids[0]} if doc_ids else {}),
-                    rerank=True,
-                )
             for sr in claim_res:
                 sr.metadata["matched_target_task"] = task.task_id
                 evidence.append(sr)
@@ -756,7 +888,12 @@ class MultiTargetRetriever:
             target=task.target,
             status=status,
             evidence=evidence,
-            diagnostics={"candidate_count": len(evidence)},
+            diagnostics={
+                "candidate_count": len(evidence),
+                "document_name": doc_name,
+                "resolved_doc_ids": doc_ids,
+                "source_filter": filters,
+            },
         )
 
     def _execute_direct_fact_task(
@@ -790,14 +927,36 @@ class MultiTargetRetriever:
             diagnostics={"candidate_count": len(evidence)},
         )
 
-    def _merge_results(self, results: list[TargetRetrievalResult]) -> list[SearchResult]:
+    def _merge_results(
+        self,
+        results: Sequence[TargetRetrievalResult],
+        *,
+        budget: int | None = None,
+    ) -> list[SearchResult]:
+        """Merge evidence round-robin so every successful target is represented first."""
         merged: list[SearchResult] = []
-        seen_ids: set[str] = set()
-        for result in results:
-            for item in result.evidence:
-                if item.chunk_id not in seen_ids:
-                    seen_ids.add(item.chunk_id)
-                    merged.append(item)
+        seen: dict[str, SearchResult] = {}
+        max_depth = max((len(result.evidence) for result in results), default=0)
+        limit = budget if budget is not None and budget > 0 else None
+
+        for rank in range(max_depth):
+            for result in results:
+                if rank >= len(result.evidence):
+                    continue
+                item = result.evidence[rank]
+                existing = seen.get(item.chunk_id)
+                if existing is not None:
+                    matched = existing.metadata.setdefault("matched_target_tasks", [])
+                    for task_id in (existing.metadata.get("matched_target_task"), result.task_id):
+                        if task_id and task_id not in matched:
+                            matched.append(task_id)
+                    continue
+                item.metadata["matched_target_task"] = result.task_id
+                item.metadata["matched_target_tasks"] = [result.task_id]
+                seen[item.chunk_id] = item
+                merged.append(item)
+                if limit is not None and len(merged) >= limit:
+                    return merged
         return merged
 
 
