@@ -171,16 +171,23 @@ class QuestionRouter:
         if deepseek_enabled():
             llm_decision = self._llm_classify(q)
             if llm_decision is not None:
-                # A structured choice question that passed deterministic
+                # A structured KB question that passed deterministic
                 # boundary checks must not be rejected solely because the LLM
                 # narrows "banking regulation" too aggressively (for example,
-                # insurance-solvency attachments that are in this KB).
+                # insurance tables and solvency attachments that are in this KB).
                 if (
                     llm_decision.intent == "OUT_OF_SCOPE"
                     and fast_decision is not None
                     and fast_decision.intent == "DOMAIN_QA"
                     and fast_decision.task_type
-                    in {"FACT_SINGLE_CHOICE", "FACT_MULTI_CHOICE"}
+                    in {
+                        "TABLE_LOOKUP",
+                        "TABLE_COMPARE",
+                        "TABLE_CALCULATION",
+                        "FACT_SINGLE_CHOICE",
+                        "FACT_MULTI_CHOICE",
+                        "DIRECT_FACT_QA",
+                    }
                 ):
                     self._log_decision(q, fast_decision)
                     return fast_decision

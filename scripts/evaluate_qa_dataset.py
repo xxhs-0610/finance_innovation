@@ -25,9 +25,27 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts.qa_eval_common import actual_behavior, build_behavior_metrics, build_retrieval_metrics, expected_behavior, retrieval_coverage
+    from scripts.qa_eval_common import (
+        DEFAULT_LABEL_CORRECTIONS_PATH,
+        actual_behavior,
+        apply_label_corrections,
+        build_behavior_metrics,
+        build_retrieval_metrics,
+        expected_behavior,
+        load_label_corrections,
+        retrieval_coverage,
+    )
 except ModuleNotFoundError:  # direct execution: python scripts/evaluate_qa_dataset.py
-    from qa_eval_common import actual_behavior, build_behavior_metrics, build_retrieval_metrics, expected_behavior, retrieval_coverage
+    from qa_eval_common import (
+        DEFAULT_LABEL_CORRECTIONS_PATH,
+        actual_behavior,
+        apply_label_corrections,
+        build_behavior_metrics,
+        build_retrieval_metrics,
+        expected_behavior,
+        load_label_corrections,
+        retrieval_coverage,
+    )
 
 try:
     from openpyxl import load_workbook
@@ -74,6 +92,24 @@ def _build_query(row: dict[str, Any]) -> str:
     if any(re.search(rf"(?:^|\s){key}[.:、：]", question) for key in OPTION_KEYS):
         return question
     return question + "\n" + "\n".join(options)
+
+
+def _original_row(row: dict[str, Any]) -> dict[str, Any]:
+    restored = dict(row)
+    for key in (
+        "question",
+        "option_a",
+        "option_b",
+        "option_c",
+        "option_d",
+        "answer",
+        "answer_text",
+        "evidence",
+    ):
+        original_key = f"original_{key}"
+        if original_key in row:
+            restored[key] = row[original_key]
+    return restored
 
 
 def _normalise_letters(value: Any) -> list[str]:
@@ -213,6 +249,8 @@ def evaluate(rows: list[dict[str, Any]], *, local: bool, limit: int | None, dela
     results: list[dict[str, Any]] = []
     for index, row in enumerate(selected_rows, start=1):
         query = _build_query(row)
+        original = _original_row(row)
+        original_query = _build_query(original)
         started = time.perf_counter()
         try:
             kwargs: dict[str, Any] = {}
@@ -228,6 +266,7 @@ def evaluate(rows: list[dict[str, Any]], *, local: bool, limit: int | None, dela
         elapsed_ms = int((time.perf_counter() - started) * 1000)
 
         gold = _gold_answer(row)
+        original_gold = _gold_answer(original)
         # Structured execution/verification is authoritative.  Numeric value
         # inference is only a last resort and accepts exactly one match.
         predicted = _extract_system_letters(response)
@@ -244,16 +283,29 @@ def evaluate(rows: list[dict[str, Any]], *, local: bool, limit: int | None, dela
             "source_type": _cell(row, "source_type"),
             "difficulty": _cell(row, "difficulty_cn") or _cell(row, "difficulty"),
             "question": _cell(row, "question"),
-            "original_question": _cell(row, "question"),
+            "original_question": _cell(original, "question"),
+            "original_submitted_question": original_query,
             "submitted_question": query,
             "query_sent_to_system": query,
             "expected_behavior": expected,
             "actual_behavior": actual,
             "behavior_correct": expected == actual,
             "retrieval_coverage": retrieval_coverage(response),
+            "original_options": {key: _cell(original, f"option_{key.lower()}") for key in OPTION_KEYS},
             "options": {key: _cell(row, f"option_{key.lower()}") for key in OPTION_KEYS},
+            "gold_answer_original": original_gold,
+            "gold_answer_effective": gold,
             "gold_answer": gold,
+            "gold_answer_text_original": _cell(original, "answer_text"),
+            "gold_answer_text_effective": _cell(row, "answer_text"),
             "gold_answer_text": _cell(row, "answer_text"),
+            "gold_evidence_original": _cell(original, "evidence"),
+            "gold_evidence_effective": _cell(row, "evidence"),
+            "correction_applied": bool(row.get("label_correction_applied")),
+            "correction_version": str(row.get("label_correction_version") or ""),
+            "correction_reason": str(row.get("label_correction_reason") or ""),
+            "correction_fields": list(row.get("label_correction_fields") or []),
+            "correction_source_cells": list(row.get("label_correction_source_cells") or []),
             "predicted_answer": predicted,
             "status": status,
             "refused": refused,
@@ -291,6 +343,7 @@ def build_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
         bucket["total"] += 1
         bucket["answered" if not item["refused"] else "refused"] += 1
         bucket["accurate" if item["accurate"] else "inaccurate"] += 1
+    corrected = [item for item in results if item.get("correction_applied")]
     return {
         "total": total,
         "answered": answered,
@@ -300,6 +353,13 @@ def build_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
         "answer_rate": round(answered / total, 4) if total else 0.0,
         "accuracy_over_all": round(accurate / total, 4) if total else 0.0,
         "accuracy_over_answered": round(accurate / answered, 4) if answered else 0.0,
+        "label_corrections": {
+            "applied_count": len(corrected),
+            "question_ids": [item["id"] for item in corrected],
+            "versions": sorted(
+                {item["correction_version"] for item in corrected if item.get("correction_version")}
+            ),
+        },
         "retrieval_metrics": build_retrieval_metrics(results),
         "behavior_metrics": build_behavior_metrics(results),
         "refusal_reasons": dict(sorted(by_reason.items(), key=lambda kv: (-kv[1], kv[0]))),
@@ -317,8 +377,9 @@ def write_reports(results: list[dict[str, Any]], summary: dict[str, Any], output
     with (output_dir / "qa_summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, ensure_ascii=False, indent=2)
     columns = [
-        "id", "qa_type", "source_type", "original_question", "submitted_question",
-        "expected_behavior", "actual_behavior", "behavior_correct", "gold_answer", "predicted_answer",
+        "id", "qa_type", "source_type", "original_question", "original_submitted_question", "submitted_question",
+        "expected_behavior", "actual_behavior", "behavior_correct", "gold_answer_original", "gold_answer_effective", "gold_answer",
+        "correction_applied", "correction_version", "correction_reason", "predicted_answer",
         "status", "refused", "accurate", "refusal_reason", "source_title", "file_label",
         "system_answer", "system_error", "elapsed_ms",
     ]
@@ -336,10 +397,14 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="只测试前 N 条，便于先试跑")
     parser.add_argument("--delay", type=float, default=0.0, help="每题之间等待秒数")
     parser.add_argument("--local", action="store_true", help="禁用 DeepSeek，使用系统本地兜底生成器")
+    parser.add_argument("--corrections", type=Path, default=DEFAULT_LABEL_CORRECTIONS_PATH, help="QA 标签修正覆盖文件")
+    parser.add_argument("--no-label-corrections", action="store_true", help="不应用修正，用于复现原始 QA 基线")
     args = parser.parse_args()
     if not args.qa.exists():
         parser.error(f"QA 文件不存在：{args.qa}")
     rows = load_rows(args.qa, args.sheet)
+    if not args.no_label_corrections:
+        rows = apply_label_corrections(rows, load_label_corrections(args.corrections))
     results = evaluate(rows, local=args.local, limit=args.limit, delay=args.delay)
     summary = build_summary(results)
     write_reports(results, summary, args.output_dir)

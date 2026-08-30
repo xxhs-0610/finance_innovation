@@ -152,12 +152,20 @@ class EvidenceAdapter:
         metadata: dict[str, Any],
     ) -> SourceType:
         """Detect source type (excel, word, pdf) based on file extension and semantics."""
-        path_lower = (local_path + " " + source_url).lower()
-        if any(path_lower.endswith(ext) or ext + "?" in path_lower for ext in (".xlsx", ".xls", ".csv")):
+        path_values = [str(value or "").strip().lower() for value in (local_path, source_url)]
+        if any(
+            path.endswith(ext) or f"{ext}?" in path
+            for path in path_values
+            for ext in (".xlsx", ".xls", ".csv")
+        ):
             return "excel"
-        if any(path_lower.endswith(ext) or ext + "?" in path_lower for ext in (".docx", ".doc")):
+        if any(
+            path.endswith(ext) or f"{ext}?" in path
+            for path in path_values
+            for ext in (".docx", ".doc")
+        ):
             return "word"
-        if ".pdf" in path_lower:
+        if any(path.endswith(".pdf") or ".pdf?" in path for path in path_values):
             return "pdf"
 
         # Check metadata

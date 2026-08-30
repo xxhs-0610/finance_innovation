@@ -22,7 +22,8 @@ from pathlib import Path
 from dataclasses import replace
 from typing import Any, Sequence
 
-from app.indexing.index_reader import KnowledgeBaseReader
+from app.indexing.index_reader import KnowledgeBaseReader, _row_to_search_result
+from app.retrieval.table_evidence import table_metric_aliases
 from app.schemas.chunk_schema import SearchResult, SourceInfo
 from app.schemas.multi_target_retrieval_schema import (
     MultiTargetRetrievalResponse,
@@ -36,6 +37,7 @@ from app.utils.paths import resolve_path
 logger = get_logger("app.retrieval.multi_target")
 
 MULTI_TARGET_EVIDENCE_PER_TASK = 2
+FACT_CHOICE_EVIDENCE_PER_TASK = 4
 YEAR_TOKEN_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
 
 
@@ -359,6 +361,23 @@ def find_matching_table_titles(
                 if v != file_name:
                     candidates.extend(query_titles(v))
 
+            # An attachment label and its internal table title can be entirely
+            # different (for example, "银行业总资产、总负债" contains the table
+            # "银行业金融机构资产负债情况表"). Resolve the attachment through the
+            # parsed-document manifest, then take table titles from that exact
+            # document instead of relying on lexical overlap between titles.
+            document_ids = _find_document_ids(p, file_name)
+            if document_ids:
+                placeholders = ",".join("?" for _ in document_ids)
+                cursor.execute(
+                    f"SELECT DISTINCT title FROM chunks WHERE chunk_type='table' "
+                    f"AND doc_id IN ({placeholders})",
+                    document_ids,
+                )
+                candidates.extend(
+                    filter_granularity([r[0] for r in cursor.fetchall()])
+                )
+
         # 3. Sheet name fallback
         if sheet_name:
             clean_sheet = (
@@ -622,7 +641,9 @@ class MultiTargetRetriever:
             return max(requested_top_k, 3)
         if task_type == "FACT_MULTI_CHOICE":
             max_sub_targets = max((len(task.sub_targets) for task in tasks), default=1)
-            return max(MULTI_TARGET_EVIDENCE_PER_TASK, max_sub_targets)
+            return max(FACT_CHOICE_EVIDENCE_PER_TASK, max_sub_targets)
+        if task_type == "FACT_SINGLE_CHOICE":
+            return FACT_CHOICE_EVIDENCE_PER_TASK
         return MULTI_TARGET_EVIDENCE_PER_TASK
 
     @staticmethod
@@ -677,8 +698,6 @@ class MultiTargetRetriever:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             try:
-                # Build target search conditions
-                terms_to_match = [t for t in (cand_target, row_target, col_target, target) if t]
                 for title in matched_titles:
                     where_clauses = ["chunk_type='table'", "title = ?"]
                     params: list[Any] = [title]
@@ -737,9 +756,15 @@ class MultiTargetRetriever:
                     # Match specific candidate or operand row
                     match_term = cand_target or row_target
                     if match_term:
-                        where_clauses.append("(text LIKE ? OR metadata_json LIKE ?)")
-                        params.append(f"%{match_term}%")
-                        params.append(f"%{match_term}%")
+                        match_aliases = table_metric_aliases(match_term)
+                        where_clauses.append(
+                            "(" + " OR ".join(
+                                "text LIKE ? OR metadata_json LIKE ?"
+                                for _ in match_aliases
+                            ) + ")"
+                        )
+                        for alias in match_aliases:
+                            params.extend((f"%{alias}%", f"%{alias}%"))
 
                     # "总资产" appears in several institution sections of the
                     # quarterly balance-sheet table. When the source explicitly
@@ -806,7 +831,9 @@ class MultiTargetRetriever:
         # other rows/columns from the same table and make the evidence package
         # ambiguous. Fall back only when the precise path found nothing.
         if not evidence:
-            query_str = f"{file_name or ''} {target}".strip()
+            lookup_aliases = table_metric_aliases(cand_target or row_target)
+            lookup_target = lookup_aliases[-1] if lookup_aliases else target
+            query_str = f"{file_name or ''} {task.source_constraints.get('scope') or ''} {lookup_target}".strip()
             filters = {"title": file_name} if file_name else {}
             reader_results = self.reader.search(
                 query_str,
@@ -878,6 +905,7 @@ class MultiTargetRetriever:
                 filters=filters,
                 rerank=True,
             )
+            claim_res = self._expand_clause_neighbors(claim_res, task.task_id)
             for sr in claim_res:
                 sr.metadata["matched_target_task"] = task.task_id
                 evidence.append(sr)
@@ -895,6 +923,81 @@ class MultiTargetRetriever:
                 "source_filter": filters,
             },
         )
+
+    def _expand_clause_neighbors(
+        self,
+        results: Sequence[SearchResult],
+        task_id: str,
+        *,
+        radius: int = 2,
+    ) -> list[SearchResult]:
+        """Add contiguous clause chunks from the same document and section family."""
+        if not results or not self.db_path.exists():
+            return list(results)
+
+        expanded: list[SearchResult] = []
+        seen: set[str] = set()
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            for seed in results:
+                if seed.chunk_type != "clause":
+                    if seed.chunk_id not in seen:
+                        expanded.append(seed)
+                        seen.add(seed.chunk_id)
+                    continue
+
+                match = re.match(r"^(.*?)(\d+)$", seed.chunk_id)
+                if not match or not seed.source.doc_id:
+                    if seed.chunk_id not in seen:
+                        expanded.append(seed)
+                        seen.add(seed.chunk_id)
+                    continue
+
+                prefix, number_text = match.groups()
+                number = int(number_text)
+                lower = max(0, number - radius)
+                upper = number + radius
+                rows = conn.execute(
+                    "SELECT * FROM chunks WHERE doc_id = ? AND chunk_type = 'clause' "
+                    "AND chunk_id LIKE ?",
+                    (seed.source.doc_id, f"{prefix}%"),
+                ).fetchall()
+                section_root = str(seed.source.section_path[0]) if seed.source.section_path else ""
+                neighbours: list[tuple[int, SearchResult]] = []
+                for row in rows:
+                    row_match = re.match(rf"^{re.escape(prefix)}(\d+)$", str(row["chunk_id"]))
+                    if not row_match:
+                        continue
+                    row_number = int(row_match.group(1))
+                    if row_number < lower or row_number > upper:
+                        continue
+                    candidate = _row_to_search_result(row, score=seed.score)
+                    candidate_root = (
+                        str(candidate.source.section_path[0])
+                        if candidate.source.section_path
+                        else ""
+                    )
+                    if section_root and candidate_root and candidate_root != section_root:
+                        continue
+                    candidate.metadata["matched_target_task"] = task_id
+                    if candidate.chunk_id != seed.chunk_id:
+                        candidate.metadata["retrieval_expansion"] = "contiguous_clause_neighbor"
+                        candidate.metadata["neighbor_of"] = seed.chunk_id
+                    neighbours.append((row_number, candidate))
+
+                for _, candidate in sorted(neighbours, key=lambda item: item[0]):
+                    if candidate.chunk_id not in seen:
+                        expanded.append(candidate)
+                        seen.add(candidate.chunk_id)
+
+            for seed in results:
+                if seed.chunk_id not in seen:
+                    expanded.append(seed)
+                    seen.add(seed.chunk_id)
+        finally:
+            conn.close()
+        return expanded
 
     def _execute_direct_fact_task(
         self, task: TargetRetrievalTask, top_k: int = 5

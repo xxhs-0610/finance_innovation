@@ -25,6 +25,7 @@ from app.schemas.table_execution_schema import (
     TableOperandResult,
 )
 from app.schemas.task_plan_schema import TaskPlan
+from app.retrieval.table_evidence import table_metric_aliases
 from app.utils.logger import get_logger
 
 logger = get_logger("app.retrieval.table_executor")
@@ -92,13 +93,14 @@ def extract_operand_value(
         text = chunk.content
         chunk_id = chunk.evidence_id
 
-        # If row is specified, ensure chunk relates to the row
-        if row and row not in text:
+        # A choice can carry a group qualifier that is not stored in the row
+        # label, for example 健康险（原保险保费收入项下） -> 健康险.
+        row_aliases = table_metric_aliases(row)
+        if row_aliases and not any(alias in text for alias in row_aliases):
             loc_row = str(chunk.location.get("row", ""))
-            if row not in loc_row:
-                row_clean = row.replace(" ", "")
+            if not any(alias in loc_row for alias in row_aliases):
                 text_clean = text.replace(" ", "")
-                if row_clean not in text_clean:
+                if not any(alias.replace(" ", "") in text_clean for alias in row_aliases):
                     continue
 
         if isinstance(chunk.structured_value, dict) and "kv" in chunk.structured_value:
@@ -130,7 +132,11 @@ def extract_operand_value(
                     pass
             continue
 
-        search_keys = [t for t in (column, target_name) if t]
+        search_keys = list(dict.fromkeys(
+            alias
+            for target in (column, target_name)
+            for alias in table_metric_aliases(target)
+        ))
 
         # 1. Exact or composite key matching with scope/column
         for sk in search_keys:

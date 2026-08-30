@@ -116,6 +116,31 @@ def _semantic_table_match(claim: str, text: str) -> bool:
     return True
 
 
+def _numbered_enumeration_support(claim: str, chunks: Sequence[Any]) -> bool:
+    """Match a summary claim to three or more contiguous numbered headings."""
+    if not re.search(r"包括|包含|涵盖", claim) or re.search(
+        r"不包括|未包括|不包含|未包含|不涵盖|未涵盖", claim
+    ):
+        return False
+    if len(chunks) < 3:
+        return False
+
+    clean_claim = clean_for_match(claim)
+    headings: list[str] = []
+    for chunk in chunks:
+        match = re.match(
+            r"^\s*\d+\s*[.．、]\s*([^。；;：:]{2,40})[。；;：:]",
+            str(chunk.content or "").strip(),
+        )
+        if not match:
+            return False
+        heading = clean_for_match(match.group(1))
+        if len(heading) < 2 or heading not in clean_claim:
+            return False
+        headings.append(heading)
+    return len(set(headings)) == len(headings)
+
+
 def detect_question_intent_target(question: str) -> str:
     """Detect whether question asks for CORRECT statement or INCORRECT/FALSE option."""
     # Only match meta-inquiries asking for false/incorrect options
@@ -621,9 +646,21 @@ class OptionVerificationEngine:
             section_text = str((chunk.location or {}).get("section") or "").strip()
             if section_text:
                 text_candidates.append(f"{section_text} {content_text}".strip())
-            text = max(
-                text_candidates,
-                key=lambda candidate: compute_sliding_similarity(claim, candidate)[0],
+            compact_claim_candidate = re.sub(r"[\s。；;，,！？?（）()]+", "", claim)
+            exact_candidates = [
+                candidate
+                for candidate in text_candidates
+                if compact_claim_candidate
+                and compact_claim_candidate
+                in re.sub(r"[\s。；;，,！？?（）()]+", "", candidate)
+            ]
+            text = (
+                min(exact_candidates, key=len)
+                if exact_candidates
+                else max(
+                    text_candidates,
+                    key=lambda candidate: compute_sliding_similarity(claim, candidate)[0],
+                )
             )
             ratio, _ = compute_sliding_similarity(claim, text)
             semantic_match = _semantic_table_match(claim, text)
@@ -669,6 +706,16 @@ class OptionVerificationEngine:
                     chunks = [item[1] for item in window]
                     combined_text = "".join(chunk.content.strip() for chunk in chunks)
                     ratio, _ = compute_sliding_similarity(claim, combined_text)
+                    if _numbered_enumeration_support(claim, chunks):
+                        return SubClaimVerification(
+                            sub_claim=claim,
+                            verdict="SUPPORTED",
+                            score=max((_retrieval_score(chunk) for chunk in chunks), default=0.0),
+                            similarity=ratio,
+                            evidence_ids=[chunk.evidence_id for chunk in chunks],
+                            supporting_text=combined_text[:120],
+                            reason="断言列举项与同一章节的连续编号条目逐项一致",
+                        )
                     semantic_match = _semantic_table_match(claim, combined_text)
                     score = max((_retrieval_score(chunk) for chunk in chunks), default=0.0)
                     if (
@@ -717,6 +764,7 @@ class OptionVerificationEngine:
             comparable_text = compact_text.replace("以下", "")
             exact_clause = (
                 (len(comparable_text) >= 8 and comparable_text in comparable_claim)
+                or (len(comparable_claim) >= 8 and comparable_claim in comparable_text)
                 or (len(clean_for_match(str(best_text or ""))) >= 8
                     and clean_for_match(str(best_text or "")) in clean_for_match(claim))
                 or _semantic_table_match(claim, str(best_text or ""))
@@ -818,6 +866,26 @@ class OptionVerificationEngine:
                     tid = meta.get("matched_target_task")
                     if tid:
                         task_map.setdefault(tid, []).append(item)
+
+        for task_id, evidence in task_map.items():
+            unique: list[Any] = []
+            seen_ids: set[str] = set()
+            for item in evidence:
+                if isinstance(item, dict):
+                    evidence_id = str(
+                        item.get("chunk_id") or item.get("evidence_id") or item.get("id") or ""
+                    )
+                else:
+                    evidence_id = str(
+                        getattr(item, "chunk_id", "")
+                        or getattr(item, "evidence_id", "")
+                    )
+                if evidence_id and evidence_id in seen_ids:
+                    continue
+                if evidence_id:
+                    seen_ids.add(evidence_id)
+                unique.append(item)
+            task_map[task_id] = unique
 
         return task_map, merged
 

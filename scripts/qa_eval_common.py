@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 
@@ -9,6 +11,79 @@ EXPECTED_BEHAVIORS = {"answer", "refuse", "clarify"}
 ANSWERED_STATUSES = {"answered", "success", "degraded"}
 CLARIFY_STATUSES = {"needs_clarification", "clarify", "clarification"}
 ERROR_STATUSES = {"error", "request_error", "http_error", "timeout"}
+DEFAULT_LABEL_CORRECTIONS_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "eval" / "qa_label_corrections.json"
+)
+CORRECTABLE_FIELDS = {
+    "question",
+    "option_a",
+    "option_b",
+    "option_c",
+    "option_d",
+    "answer",
+    "answer_text",
+    "evidence",
+    "expected_behavior",
+}
+
+
+def load_label_corrections(path: Path | None = None) -> dict[str, Any]:
+    """Load and validate the versioned QA correction overlay."""
+
+    correction_path = path or DEFAULT_LABEL_CORRECTIONS_PATH
+    if not correction_path.exists():
+        return {"version": "", "corrections": {}, "path": str(correction_path)}
+
+    payload = json.loads(correction_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("corrections"), dict):
+        raise ValueError(f"QA 修正文件格式无效: {correction_path}")
+    for question_id, correction in payload["corrections"].items():
+        if not isinstance(correction, dict):
+            raise ValueError(f"QA 修正项 {question_id} 必须是对象")
+        unknown = set(correction) - CORRECTABLE_FIELDS - {"reason", "source_cells"}
+        if unknown:
+            raise ValueError(
+                f"QA 修正项 {question_id} 包含未知字段: {', '.join(sorted(unknown))}"
+            )
+        if not str(correction.get("reason") or "").strip():
+            raise ValueError(f"QA 修正项 {question_id} 缺少 reason")
+    return {**payload, "path": str(correction_path)}
+
+
+def apply_label_corrections(
+    rows: Sequence[Mapping[str, Any]],
+    payload: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Apply corrections without mutating workbook-derived rows."""
+
+    corrections = payload.get("corrections")
+    if not isinstance(corrections, Mapping):
+        raise ValueError("QA 修正数据缺少 corrections 对象")
+    version = str(payload.get("version") or "")
+    corrected_rows: list[dict[str, Any]] = []
+    for source_row in rows:
+        row = dict(source_row)
+        question_id = str(row.get("id") or "").strip().upper()
+        correction = corrections.get(question_id)
+        row["label_correction_applied"] = False
+        if not isinstance(correction, Mapping):
+            corrected_rows.append(row)
+            continue
+
+        changed_fields: list[str] = []
+        for field in CORRECTABLE_FIELDS:
+            if field not in correction:
+                continue
+            row[f"original_{field}"] = row.get(field)
+            row[field] = correction[field]
+            changed_fields.append(field)
+        row["label_correction_applied"] = True
+        row["label_correction_version"] = version
+        row["label_correction_reason"] = str(correction.get("reason") or "")
+        row["label_correction_source_cells"] = list(correction.get("source_cells") or [])
+        row["label_correction_fields"] = sorted(changed_fields)
+        corrected_rows.append(row)
+    return corrected_rows
 
 
 def expected_behavior(row: Mapping[str, Any]) -> str:

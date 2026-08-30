@@ -142,7 +142,7 @@ def export_jsonl(database: ParsingDatabase, *, include_cell_archive: bool = True
                    b.source_locator,d.document_no
             FROM rag_document_blocks b
             JOIN rag_documents d ON d.doc_id=b.doc_id
-            WHERE b.is_active=1 AND b.block_type IN ('paragraph','clause','list') AND b.text<>''
+            WHERE b.is_active=1 AND b.block_type IN ('heading','paragraph','clause','list') AND b.text<>''
             ORDER BY d.source_seq,b.sequence_no
         """
         for row in database.stream_query(sql):

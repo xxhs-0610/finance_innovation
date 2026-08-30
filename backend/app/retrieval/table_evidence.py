@@ -16,7 +16,25 @@ QUARTER_RE = re.compile(r"第?([一二三四1234])季度")
 Q_RE = re.compile(r"(?:19|20)\d{2}[Qq]([1-4])")
 NORMALIZE_RE = re.compile(r"[\s，。！？?；;：:、（）()【】\[\]<>《》_-]+")
 NUMBER_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[%％])?$")
+METRIC_GROUP_QUALIFIER_RE = re.compile(
+    r"\s*[（(][^（）()]{1,40}项下[）)]\s*$"
+)
 QUARTER_MAP = {"一": "1", "二": "2", "三": "3", "四": "4"}
+
+
+def table_metric_aliases(value: object) -> list[str]:
+    """Return exact and base row labels for a trailing group qualifier.
+
+    QA choices may disambiguate a repeated table row as
+    ``健康险（原保险保费收入项下）`` while the indexed row label is only
+    ``健康险``. Only the explicit ``...项下`` suffix is relaxed; other
+    parenthetical text remains part of the metric name.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    base = METRIC_GROUP_QUALIFIER_RE.sub("", raw).strip()
+    return [raw] if not base or base == raw else [raw, base]
 
 
 def normalize_period(value: object, *, context_year: str = "") -> str:

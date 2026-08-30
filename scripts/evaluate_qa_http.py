@@ -7,9 +7,27 @@ from pathlib import Path
 from urllib import error, request
 from openpyxl import load_workbook
 try:
-    from scripts.qa_eval_common import actual_behavior, build_behavior_metrics, build_retrieval_metrics, expected_behavior, retrieval_coverage
+    from scripts.qa_eval_common import (
+        DEFAULT_LABEL_CORRECTIONS_PATH,
+        actual_behavior,
+        apply_label_corrections,
+        build_behavior_metrics,
+        build_retrieval_metrics,
+        expected_behavior,
+        load_label_corrections,
+        retrieval_coverage,
+    )
 except ModuleNotFoundError:  # direct execution: python scripts/evaluate_qa_http.py
-    from qa_eval_common import actual_behavior, build_behavior_metrics, build_retrieval_metrics, expected_behavior, retrieval_coverage
+    from qa_eval_common import (
+        DEFAULT_LABEL_CORRECTIONS_PATH,
+        actual_behavior,
+        apply_label_corrections,
+        build_behavior_metrics,
+        build_retrieval_metrics,
+        expected_behavior,
+        load_label_corrections,
+        retrieval_coverage,
+    )
 
 ROOT = Path(__file__).resolve().parents[1]
 KEYS = ("A", "B", "C", "D")
@@ -24,6 +42,14 @@ def build_query(row):
     if opts and not re.search(r"(?:^|\s)[ABCD][.、:：]", q):
         q += "\n" + "\n".join(opts)
     return q
+
+def original_row(row):
+    restored = dict(row)
+    for key in ("question", "option_a", "option_b", "option_c", "option_d", "answer", "answer_text", "evidence"):
+        original_key = f"original_{key}"
+        if original_key in row:
+            restored[key] = row[original_key]
+    return restored
 
 def letters(v):
     return list(dict.fromkeys(re.findall(r"[ABCD]", str(v or "").upper())))
@@ -157,17 +183,54 @@ def reason(result):
 
 def _evaluate_one(row, index, endpoint, timeout):
     q = build_query(row)
+    original = original_row(row)
+    original_query = build_query(original)
     started = time.perf_counter()
     resp = post_json(endpoint, {"question": q, "top_k": 5}, timeout)
     ms = int((time.perf_counter() - started) * 1000)
     gold = letters(row.get("answer")) or letters(row.get("answer_text"))
+    original_gold = letters(original.get("answer")) or letters(original.get("answer_text"))
     pred = predicted(resp)
     status = str(resp.get("status") or "unknown")
     expected = expected_behavior(row)
     actual = actual_behavior(status)
     refused = status not in {"answered", "success", "degraded"}
     accurate = bool(gold) and pred == gold and not refused
-    item = {"id": cell(row, "id") or f"row_{index:03d}", "qa_type": cell(row, "qa_type"), "question": cell(row, "question"), "original_question": cell(row, "question"), "submitted_question": q, "expected_behavior": expected, "actual_behavior": actual, "behavior_correct": expected == actual, "retrieval_coverage": retrieval_coverage(resp), "gold_answer": gold, "predicted_answer": pred, "status": status, "refused": refused, "accurate": accurate, "refusal_reason": reason(resp), "source_title": cell(row, "source_title"), "system_answer": resp.get("answer", ""), "elapsed_ms": ms, "response": resp}
+    item = {
+        "id": cell(row, "id") or f"row_{index:03d}",
+        "qa_type": cell(row, "qa_type"),
+        "question": cell(row, "question"),
+        "original_question": cell(original, "question"),
+        "original_submitted_question": original_query,
+        "submitted_question": q,
+        "expected_behavior": expected,
+        "actual_behavior": actual,
+        "behavior_correct": expected == actual,
+        "retrieval_coverage": retrieval_coverage(resp),
+        "original_options": {key: cell(original, f"option_{key.lower()}") for key in KEYS},
+        "options": {key: cell(row, f"option_{key.lower()}") for key in KEYS},
+        "gold_answer_original": original_gold,
+        "gold_answer_effective": gold,
+        "gold_answer": gold,
+        "gold_answer_text_original": cell(original, "answer_text"),
+        "gold_answer_text_effective": cell(row, "answer_text"),
+        "gold_evidence_original": cell(original, "evidence"),
+        "gold_evidence_effective": cell(row, "evidence"),
+        "correction_applied": bool(row.get("label_correction_applied")),
+        "correction_version": str(row.get("label_correction_version") or ""),
+        "correction_reason": str(row.get("label_correction_reason") or ""),
+        "correction_fields": list(row.get("label_correction_fields") or []),
+        "correction_source_cells": list(row.get("label_correction_source_cells") or []),
+        "predicted_answer": pred,
+        "status": status,
+        "refused": refused,
+        "accurate": accurate,
+        "refusal_reason": reason(resp),
+        "source_title": cell(row, "source_title"),
+        "system_answer": resp.get("answer", ""),
+        "elapsed_ms": ms,
+        "response": resp,
+    }
     return index, item
 
 def evaluate(rows, endpoint, limit, timeout, workers=1):
@@ -203,16 +266,17 @@ def report(results, outdir, endpoint):
     for x in results:
         b = by_type.setdefault(x["qa_type"] or "unclassified", {"total": 0, "answered": 0, "refused": 0, "correct": 0, "wrong": 0})
         b["total"] += 1; b["answered"] += int(not x["refused"]); b["refused"] += int(x["refused"]); b["correct"] += int(x["accurate"]); b["wrong"] += int(not x["refused"] and not x["accurate"])
-    summary = {"total": total, "question_ids": [x["id"] for x in results], "answered": answered, "refused": refused, "correct": correct, "wrong_answered": len(wrong), "accuracy_over_all": correct / total if total else 0, "accuracy_over_answered": correct / answered if answered else 0, "retrieval_metrics": build_retrieval_metrics(results), "behavior_metrics": build_behavior_metrics(results), "refused_ids": [x["id"] for x in refusals], "wrong_ids": [x["id"] for x in wrong], "by_qa_type": by_type}
+    corrected = [x for x in results if x.get("correction_applied")]
+    summary = {"total": total, "question_ids": [x["id"] for x in results], "answered": answered, "refused": refused, "correct": correct, "wrong_answered": len(wrong), "accuracy_over_all": correct / total if total else 0, "accuracy_over_answered": correct / answered if answered else 0, "label_corrections": {"applied_count": len(corrected), "question_ids": [x["id"] for x in corrected], "versions": sorted({x["correction_version"] for x in corrected if x.get("correction_version")})}, "retrieval_metrics": build_retrieval_metrics(results), "behavior_metrics": build_behavior_metrics(results), "refused_ids": [x["id"] for x in refusals], "wrong_ids": [x["id"] for x in wrong], "by_qa_type": by_type}
     (outdir / "qa_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     with (outdir / "qa_results.jsonl").open("w", encoding="utf-8") as f:
         for x in results: f.write(json.dumps(x, ensure_ascii=False) + "\n")
-    cols = ["id", "qa_type", "original_question", "submitted_question", "expected_behavior", "actual_behavior", "behavior_correct", "gold_answer", "predicted_answer", "status", "refused", "accurate", "refusal_reason", "source_title", "system_answer", "elapsed_ms"]
+    cols = ["id", "qa_type", "original_question", "original_submitted_question", "submitted_question", "expected_behavior", "actual_behavior", "behavior_correct", "gold_answer_original", "gold_answer_effective", "gold_answer", "correction_applied", "correction_version", "correction_reason", "predicted_answer", "status", "refused", "accurate", "refusal_reason", "source_title", "system_answer", "elapsed_ms"]
     with (outdir / "qa_results.csv").open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore"); w.writeheader(); w.writerows(results)
     behavior = summary["behavior_metrics"]
     retrieval = summary["retrieval_metrics"]
-    md = ["# QA HTTP Evaluation Summary", "", f"- Endpoint: `POST {endpoint}` (same as frontend)", "- Sent only question and options; gold answer/evidence were not sent.", "- DeepSeek remained enabled according to `.env`; local mode was not used.", f"- Scope: {total} selected questions; accuracy applies only to this run.", f"- Total: {total}", f"- Answered: {answered}", f"- Refused/request failed: {refused}", f"- Correct: {correct}", f"- Wrong among answered: {len(wrong)}", f"- Overall accuracy: {correct / total:.2%}" if total else "- Overall accuracy: 0.00%", f"- Answered accuracy: {correct / answered:.2%}" if answered else "- Answered accuracy: 0.00%", f"- Average target coverage: {retrieval['average_target_coverage']:.2%}" if retrieval["average_target_coverage"] is not None else "- Average target coverage: n/a", f"- Full target coverage rate: {retrieval['full_coverage_rate']:.2%}" if retrieval["full_coverage_rate"] is not None else "- Full target coverage rate: n/a", f"- Behavior accuracy: {behavior['behavior_accuracy']:.2%}" if behavior["behavior_accuracy"] is not None else "- Behavior accuracy: n/a", f"- False refusal rate: {behavior['false_refusal_rate']:.2%}" if behavior["false_refusal_rate"] is not None else "- False refusal rate: n/a", f"- Refusal precision/recall: {behavior['refusal_precision']:.2%} / {behavior['refusal_recall']:.2%}" if behavior["refusal_precision"] is not None and behavior["refusal_recall"] is not None else "- Refusal precision/recall: n/a", f"- Clarification precision/recall: {behavior['clarification_precision']:.2%} / {behavior['clarification_recall']:.2%}" if behavior["clarification_precision"] is not None and behavior["clarification_recall"] is not None else "- Clarification precision/recall: n/a", "", "## By type", "", "|Type|Total|Answered|Refused|Correct|Wrong|", "|---|---:|---:|---:|---:|---:|"]
+    md = ["# QA HTTP Evaluation Summary", "", f"- Endpoint: `POST {endpoint}` (same as frontend)", "- Sent only question and options; gold answer/evidence were not sent.", "- DeepSeek remained enabled according to `.env`; local mode was not used.", f"- Scope: {total} selected questions; accuracy applies only to this run.", f"- Label corrections applied: {len(corrected)}" + (f" ({', '.join(x['id'] for x in corrected)})" if corrected else ""), f"- Total: {total}", f"- Answered: {answered}", f"- Refused/request failed: {refused}", f"- Correct: {correct}", f"- Wrong among answered: {len(wrong)}", f"- Overall accuracy: {correct / total:.2%}" if total else "- Overall accuracy: 0.00%", f"- Answered accuracy: {correct / answered:.2%}" if answered else "- Answered accuracy: 0.00%", f"- Average target coverage: {retrieval['average_target_coverage']:.2%}" if retrieval["average_target_coverage"] is not None else "- Average target coverage: n/a", f"- Full target coverage rate: {retrieval['full_coverage_rate']:.2%}" if retrieval["full_coverage_rate"] is not None else "- Full target coverage rate: n/a", f"- Behavior accuracy: {behavior['behavior_accuracy']:.2%}" if behavior["behavior_accuracy"] is not None else "- Behavior accuracy: n/a", f"- False refusal rate: {behavior['false_refusal_rate']:.2%}" if behavior["false_refusal_rate"] is not None else "- False refusal rate: n/a", f"- Refusal precision/recall: {behavior['refusal_precision']:.2%} / {behavior['refusal_recall']:.2%}" if behavior["refusal_precision"] is not None and behavior["refusal_recall"] is not None else "- Refusal precision/recall: n/a", f"- Clarification precision/recall: {behavior['clarification_precision']:.2%} / {behavior['clarification_recall']:.2%}" if behavior["clarification_precision"] is not None and behavior["clarification_recall"] is not None else "- Clarification precision/recall: n/a", "", "## By type", "", "|Type|Total|Answered|Refused|Correct|Wrong|", "|---|---:|---:|---:|---:|---:|"]
     for typ, b in by_type.items():
         md.append(f"|{typ}|{b['total']}|{b['answered']}|{b['refused']}|{b['correct']}|{b['wrong']}|")
     md += ["", "## Refused/request failed", "", "|ID|Status|Reason|", "|---|---|---|"]
@@ -233,6 +297,8 @@ def main():
     ap.add_argument("--ids", default="", help="指定题号，如 Q010,Q015,Q020")
     ap.add_argument("--range", dest="ranges", action="append", default=[], help="题号闭区间，如 Q010-Q020；可重复")
     ap.add_argument("--failed-from", type=Path, default=None, help="只重测旧 qa_results.jsonl/qa_summary.json 中的问题题")
+    ap.add_argument("--corrections", type=Path, default=DEFAULT_LABEL_CORRECTIONS_PATH, help="QA 标签修正覆盖文件")
+    ap.add_argument("--no-label-corrections", action="store_true", help="不应用修正，用于复现原始 QA 基线")
     args = ap.parse_args()
 
     if args.workers < 1:
@@ -241,8 +307,11 @@ def main():
     selection_requested = bool(args.ids.strip() or args.ranges or args.failed_from)
     try:
         failed_ids = load_failed_ids(args.failed_from)
+        rows = load_rows(args.qa)
+        if not args.no_label_corrections:
+            rows = apply_label_corrections(rows, load_label_corrections(args.corrections))
         selected = select_rows(
-            load_rows(args.qa),
+            rows,
             ids=args.ids,
             ranges=args.ranges,
             failed_ids=failed_ids,
