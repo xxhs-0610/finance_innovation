@@ -71,6 +71,11 @@ class MultiTargetRetrievalResponse:
         return {
             "query": self.query,
             "task_type": self.task_type,
+            # Preserve the execution plan through serialization.  Module 4
+            # relies on this plan to dispatch TABLE_LOOKUP/COMPARE/CALCULATION
+            # to the deterministic table executor; dropping it silently
+            # downgrades an otherwise answerable table task to DIRECT_QA.
+            "task_plan": self.task_plan.to_dict() if self.task_plan else None,
             "retrieval_tasks": [t.to_dict() for t in self.retrieval_tasks],
             "retrieval_results": [r.to_dict() for r in self.retrieval_results],
             "merged_evidence": [e.to_dict() for e in self.merged_evidence],

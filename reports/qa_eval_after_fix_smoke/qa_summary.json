@@ -1,0 +1,33 @@
+{
+  "total": 20,
+  "answered": 18,
+  "refused": 2,
+  "accurate": 14,
+  "inaccurate_answered": 4,
+  "answer_rate": 0.9,
+  "accuracy_over_all": 0.7,
+  "accuracy_over_answered": 0.7778,
+  "refusal_reasons": {
+    "no_reliable_evidence": 1,
+    "检索证据未完全覆盖问题要求的年份，缺少：1995年的数据；缺少1995年监管统计数据": 1
+  },
+  "by_qa_type": {
+    "表格取数": {
+      "total": 20,
+      "answered": 18,
+      "refused": 2,
+      "accurate": 14,
+      "inaccurate": 6
+    }
+  },
+  "refused_ids": [
+    "Q010",
+    "Q020"
+  ],
+  "inaccurate_ids": [
+    "Q008",
+    "Q009",
+    "Q018",
+    "Q019"
+  ]
+}

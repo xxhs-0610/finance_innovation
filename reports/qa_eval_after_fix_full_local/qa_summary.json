@@ -1,0 +1,93 @@
+{
+  "total": 300,
+  "answered": 300,
+  "refused": 0,
+  "accurate": 258,
+  "inaccurate_answered": 42,
+  "answer_rate": 1.0,
+  "accuracy_over_all": 0.86,
+  "accuracy_over_answered": 0.86,
+  "refusal_reasons": {},
+  "by_qa_type": {
+    "表格取数": {
+      "total": 34,
+      "answered": 34,
+      "refused": 0,
+      "accurate": 33,
+      "inaccurate": 1
+    },
+    "表格比较": {
+      "total": 33,
+      "answered": 33,
+      "refused": 0,
+      "accurate": 30,
+      "inaccurate": 3
+    },
+    "表格计算": {
+      "total": 33,
+      "answered": 33,
+      "refused": 0,
+      "accurate": 33,
+      "inaccurate": 0
+    },
+    "单事实检索": {
+      "total": 134,
+      "answered": 134,
+      "refused": 0,
+      "accurate": 117,
+      "inaccurate": 17
+    },
+    "多事实检索": {
+      "total": 66,
+      "answered": 66,
+      "refused": 0,
+      "accurate": 45,
+      "inaccurate": 21
+    }
+  },
+  "refused_ids": [],
+  "inaccurate_ids": [
+    "Q019",
+    "Q051",
+    "Q059",
+    "Q067",
+    "Q104",
+    "Q106",
+    "Q118",
+    "Q136",
+    "Q160",
+    "Q168",
+    "Q176",
+    "Q187",
+    "Q200",
+    "Q201",
+    "Q206",
+    "Q207",
+    "Q212",
+    "Q213",
+    "Q218",
+    "Q219",
+    "Q224",
+    "Q225",
+    "Q230",
+    "Q236",
+    "Q242",
+    "Q243",
+    "Q248",
+    "Q254",
+    "Q255",
+    "Q260",
+    "Q261",
+    "Q266",
+    "Q272",
+    "Q273",
+    "Q278",
+    "Q279",
+    "Q284",
+    "Q285",
+    "Q290",
+    "Q291",
+    "Q296",
+    "Q297"
+  ]
+}

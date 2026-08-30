@@ -150,7 +150,7 @@ class TaskPlan:
             return res
 
         elif t == "TABLE_COMPARE":
-            return {
+            res = {
                 "task_type": "TABLE_COMPARE",
                 "source": self.source.to_dict() if self.source else {"file_name": None, "sheet_name": None},
                 "operation": self.operation or "MAX",
@@ -158,6 +158,9 @@ class TaskPlan:
                 "candidates": [c.to_dict() for c in self.candidates],
                 "need_clarification": self.need_clarification,
             }
+            if self.options and isinstance(self.options, dict):
+                res["options"] = self.options
+            return res
 
         elif t == "TABLE_CALCULATION":
             res = {

@@ -192,10 +192,16 @@ class QueryAnalyzer:
         query_type = classify_query(normalized)
 
         # 0. Generate Execution Plan via TaskPlanner
+        # The API/evaluator commonly embeds A-D options directly in the
+        # question and does not pass a separate ``options`` mapping. Extract
+        # them here so TABLE_COMPARE and choice verification retain all
+        # candidates instead of producing an empty plan.
+        extracted_stem, extracted_options = extract_choice_options(normalized)
+        effective_options = options or extracted_options
         task_plan = task_planner.plan(
             question=normalized,
             task_type=task_type,
-            options=options,
+            options=effective_options,
             semantic_hint=semantic,
         )
 

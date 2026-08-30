@@ -149,6 +149,7 @@ class IntermediateEvidenceVerifier:
                 op_item.name,
                 row=op_item.row,
                 column=op_item.column,
+                scope=task_plan.scope,
             )
             operands.append(op)
 

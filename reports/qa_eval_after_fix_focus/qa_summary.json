@@ -1,0 +1,63 @@
+{
+  "total": 66,
+  "answered": 43,
+  "refused": 23,
+  "accurate": 43,
+  "inaccurate_answered": 0,
+  "answer_rate": 0.6515,
+  "accuracy_over_all": 0.6515,
+  "accuracy_over_answered": 1.0,
+  "refusal_reasons": {
+    "no_reliable_evidence": 21,
+    "MISSING_OPERAND": 2
+  },
+  "by_qa_type": {
+    "表格取数": {
+      "total": 15,
+      "answered": 9,
+      "refused": 6,
+      "accurate": 9,
+      "inaccurate": 6
+    },
+    "表格比较": {
+      "total": 33,
+      "answered": 28,
+      "refused": 5,
+      "accurate": 28,
+      "inaccurate": 5
+    },
+    "表格计算": {
+      "total": 18,
+      "answered": 6,
+      "refused": 12,
+      "accurate": 6,
+      "inaccurate": 12
+    }
+  },
+  "refused_ids": [
+    "Q020",
+    "Q021",
+    "Q022",
+    "Q026",
+    "Q030",
+    "Q034",
+    "Q042",
+    "Q043",
+    "Q051",
+    "Q059",
+    "Q067",
+    "Q074",
+    "Q075",
+    "Q076",
+    "Q077",
+    "Q078",
+    "Q079",
+    "Q080",
+    "Q081",
+    "Q082",
+    "Q083",
+    "Q084",
+    "Q085"
+  ],
+  "inaccurate_ids": []
+}

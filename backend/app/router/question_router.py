@@ -115,6 +115,7 @@ class QuestionRouter:
             r"(?:两处取数|取数并计算|从.*?到.*?的数值变化|从.*?到.*?数值变化|数值变化|相差多少|相差约为多少|相差|差距|差额是多少|差额约为多少|差额|总和|之和|两者之和|合计与.*?相差|合计是多少|合计为多少|增加了多少|减少了多少|增长率|变化率|增幅|降幅|比值|占.*?比重|占.*?比值|占.*?比例|比重是多少|算得数值变化|绝对值)",
             re.IGNORECASE,
         )
+        self.table_calc_re_ui = re.compile(r"(?:数值变化|变化约为|从.{0,40}到.{0,40}(?:变化|差值|相差)|差值|差额|变化量)", re.IGNORECASE)
         self.table_compare_re = re.compile(
             r"(?:哪一项数值最高|哪一项数值最低|哪项数值最高|哪项数值最低|哪一项最高|哪一项最低|哪项最高|哪项最低|数值最高|数值最低|哪一项最大|哪一项最小|哪项最大|哪项最小|谁最高|谁最低|谁最大|谁最小|谁最多|谁最少|最高的是|最低的是|谁更[多少高低大小]|谁的.*?更[多少高低大小]|哪项.*?更[多少高低大小]|哪个.*?更[多少高低大小]|按大小比较|比较(?:.*?)(?:谁|最大|最高|最低|最小)|(?:从高到低|从低到高|数值排序|指标排序))",
             re.IGNORECASE,
@@ -186,7 +187,7 @@ class QuestionRouter:
         """
         if self.choice_format_re.search(text):
             return True
-        if self.table_calc_re.search(text):
+        if self.table_calc_re.search(text) or (self.table_calc_re_ui.search(text) and self.table_context_re.search(text)):
             return True
         if self.table_compare_re.search(text):
             return True
@@ -310,7 +311,10 @@ class QuestionRouter:
 
         # D. Domain QA Task Types
         # D1. TABLE_CALCULATION: Explicit multi-value arithmetic or variation calculation
-        if self.table_calc_re.search(text):
+        if self.table_calc_re.search(text) or (
+            self.table_calc_re_ui.search(text)
+            and self.table_context_re.search(text)
+        ):
             return RouteDecision(
                 intent="DOMAIN_QA",
                 task_type="TABLE_CALCULATION",

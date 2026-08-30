@@ -59,6 +59,15 @@ def extract_choice_options(text: str) -> tuple[str, dict[str, str]]:
         re.DOTALL,
     )
     matches = list(pattern.finditer(raw))
+    # In compact inline questions, punctuation before an option may be a
+    # closing quote/parenthesis or a comma. Accept these separators while
+    # still requiring at least two labelled choices.
+    if len(matches) < 2:
+        compact_pattern = re.compile(
+            r"(?P<label>[A-D])\s*[:：\.、]\s*(?P<content>.*?)(?=(?:\s*[A-D]\s*[:：\.、]|$))",
+            re.DOTALL,
+        )
+        matches = list(compact_pattern.finditer(raw))
     if len(matches) >= 2:
         labels = [m.group("label") for m in matches]
         if "A" in labels:
@@ -69,6 +78,7 @@ def extract_choice_options(text: str) -> tuple[str, dict[str, str]]:
             for m in matches:
                 lbl = m.group("label")
                 content = m.group("content").strip()
+                content = content.replace("\\n", " ").strip()
                 options[lbl] = content
             return stem, options
     return raw, {}
@@ -117,13 +127,16 @@ class TaskPlanner:
 
         norm_task_type = self._normalize_task_type(effective_task_type or self._detect_task_type(stem, effective_opts))
 
-        if self._is_numeric_table_lookup(raw, effective_opts):
-            norm_task_type = "TABLE_LOOKUP"
-
         # A question that names an Excel/report source and asks for one value is
         # a table lookup even when it is presented with A-D numeric answers.
-        # The options are answer candidates, not independent retrieval targets.
-        if self._is_numeric_table_lookup(raw, effective_opts):
+        # Do not override an explicit comparison/calculation route: those
+        # questions also contain numeric options and often ask "多少".
+        # Previously this check ran twice and converted TABLE_CALCULATION (and
+        # TABLE_COMPARE) into TABLE_LOOKUP, losing required operands/candidates.
+        if (
+            norm_task_type not in {"TABLE_COMPARE", "TABLE_CALCULATION"}
+            and self._is_numeric_table_lookup(raw, effective_opts)
+        ):
             norm_task_type = "TABLE_LOOKUP"
 
         # 2. Extract common entities (Strictly without hallucination)
@@ -390,6 +403,29 @@ class TaskPlanner:
             r"[“\"‘']?(?P<op1>[^”\"’'\s]+)[”\"’']?\s*与\s*[“\"‘']?(?P<op2>[^”\"’'\s]+)[”\"’']?\s*(?:相差|差距|之和)",
             stem,
         )
+
+        # Robust Unicode fallback for the common form:
+        # “指标”从“起始口径”到“结束口径”。  The original patterns were
+        # written against mojibake quote characters and can miss perfectly
+        # normal Chinese input after a locale/encoding round-trip.
+        if not (m1 or m2):
+            m_unicode = re.search(
+                r'[\u201c\"「『](?P<row>[^\u201d\"」』]+)[\u201d\"」』]\s*'
+                r'从\s*[\u201c\"「『](?P<from_col>[^\u201d\"」』]+)[\u201d\"」』]\s*'
+                r'到\s*[\u201c\"「『](?P<to_col>[^\u201d\"」』]+)[\u201d\"」』]',
+                stem,
+            )
+            if m_unicode:
+                m1 = m_unicode
+
+        if not (m1 or m2):
+            m_unicode2 = re.search(
+                r'从\s*[\u201c\"「『](?P<from_col>[^\u201d\"」』]+)[\u201d\"」』]\s*'
+                r'到\s*[\u201c\"「『](?P<to_col>[^\u201d\"」』]+)[\u201d\"」』]',
+                stem,
+            )
+            if m_unicode2:
+                m2 = m_unicode2
 
         if m1:
             row_name = m1.group("row").strip()

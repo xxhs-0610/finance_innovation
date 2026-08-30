@@ -1,0 +1,22 @@
+{
+  "total": 2,
+  "answered": 2,
+  "refused": 0,
+  "accurate": 2,
+  "inaccurate_answered": 0,
+  "answer_rate": 1.0,
+  "accuracy_over_all": 1.0,
+  "accuracy_over_answered": 1.0,
+  "refusal_reasons": {},
+  "by_qa_type": {
+    "表格取数": {
+      "total": 2,
+      "answered": 2,
+      "refused": 0,
+      "accurate": 2,
+      "inaccurate": 0
+    }
+  },
+  "refused_ids": [],
+  "inaccurate_ids": []
+}

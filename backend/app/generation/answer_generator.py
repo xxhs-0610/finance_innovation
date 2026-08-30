@@ -98,6 +98,7 @@ def generate_answer(
     # for the final natural-language answer when an LLM generator is enabled.
     generation_question = str(question or "").strip()
     deterministic_execution = None
+    deterministic_answer_text = ""
     verify_response = None
 
     if task_plan and task_type in {"TABLE_LOOKUP", "TABLE_COMPARE", "TABLE_CALCULATION"}:
@@ -119,6 +120,7 @@ def generate_answer(
                     ans_text = answer_composer.compose_table_lookup_answer(exec_result, task_plan, normalized)
 
                 deterministic_execution = exec_result
+                deterministic_answer_text = ans_text
                 generation_question = (
                     f"{generation_question}\n\n"
                     "【程序确定性核验结果】请将以下已核验事实组织成最终回答，不能修改数值或选项：\n"
@@ -418,6 +420,8 @@ def generate_answer(
                 generated = answer_composer.compose_fact_choice_answer(
                     verify_response, task_plan, evidence_for_gen
                 )
+            elif deterministic_answer_text:
+                generated = deterministic_answer_text
             else:
                 generated = _extractive_generator(generation_question, evidence_for_gen)
             logger.warning("[AnswerGenerator] DeepSeek 不可用，已切换为本地证据抽取式回答")
@@ -436,6 +440,20 @@ def generate_answer(
                 retrieval_diagnostics,
             )
     answer_text = str(generated or "").strip()
+    # For table lookup/compare/calculation, preserve DeepSeek's prose when it
+    # explicitly carries the verified option/value. If it omits the decisive
+    # result or rewrites it, fall back to the deterministic composer so a
+    # transport/model response cannot change a verified numeric conclusion.
+    if deterministic_answer_text:
+        exec_result = deterministic_execution
+        required_tokens = []
+        if exec_result is not None:
+            if exec_result.matched_option:
+                required_tokens.append(str(exec_result.matched_option))
+            if exec_result.result is not None:
+                required_tokens.append(str(exec_result.result))
+        if required_tokens and not all(token in answer_text for token in required_tokens):
+            answer_text = deterministic_answer_text
     if answer_text.upper() == "REFUSE" or answer_text.upper().startswith("REFUSE"):
         # A model-side REFUSE can be overly conservative when deterministic
         # option verification already selected an answer.  Re-run the local
@@ -447,6 +465,8 @@ def generate_answer(
                 answer_text = answer_composer.compose_fact_choice_answer(
                     verify_response, task_plan, evidence_for_gen
                 )
+            elif deterministic_answer_text:
+                answer_text = deterministic_answer_text
             else:
                 answer_text = str(_extractive_generator(generation_question, evidence_for_gen) or "").strip()
         except Exception:
@@ -536,6 +556,19 @@ def generate_answer(
         and normalized
     )
 
+    # Table answers are produced from verified cell values and deterministic
+    # arithmetic/comparison.  The generic post-generation verifier can treat
+    # those numeric claims as unsupported when the evidence text is a compact
+    # serialized row (or when DeepSeek reformats the number).  Once the table
+    # executor has succeeded, its result is authoritative; a verifier-format
+    # mismatch must not turn an otherwise valid table answer into REFUSED.
+    deterministic_table_answer = bool(
+        deterministic_execution is not None
+        and getattr(deterministic_execution, "status", "") == "SUCCESS"
+        and deterministic_answer_text
+        and normalized
+    )
+
     if not verification["passed"] and deterministic_choice_answer:
         risk_tips.append(
             "选项已由本地检索证据确定；通用生成后校验发现的是格式/附带文本问题，已保留确定性选项答案。"
@@ -547,6 +580,19 @@ def generate_answer(
             "issues": verification.get("issues", []),
         }
         grounding_action = "PASS_DETERMINISTIC_OPTION"
+
+    if not verification["passed"] and deterministic_table_answer:
+        risk_tips.append(
+            "表格数值和运算结果已由确定性表格执行器根据检索单元格核验；通用事后核验仅发现格式化/表述差异，已保留程序计算结果。"
+        )
+        answer_text = deterministic_answer_text
+        verification = {
+            **verification,
+            "passed": True,
+            "status": "PASS_DETERMINISTIC_TABLE",
+            "issues": verification.get("issues", []),
+        }
+        grounding_action = "PASS_DETERMINISTIC_TABLE"
 
     if not verification["passed"]:
         status = "refused"
@@ -576,6 +622,7 @@ def generate_answer(
         citations=citations,
         verification={
             **verification,
+            **({"table_execution": deterministic_execution.to_dict()} if deterministic_execution is not None else {}),
             **({"option_verification": verify_response.to_dict()} if verify_response is not None else {}),
             "sufficiency": sufficiency.to_dict(),
             "evidence_verifier": verifier_result.to_dict(),

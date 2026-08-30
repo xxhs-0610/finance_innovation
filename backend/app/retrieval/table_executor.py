@@ -131,6 +131,76 @@ def extract_operand_value(
             continue
 
         search_keys = [t for t in (column, target_name) if t]
+        # Normalize shorthand period labels used in QA questions to the
+        # concrete headers serialized by the Excel parser.  In these
+        # quarterly regulator tables, “年-季度” denotes the first quarter
+        # column and bare “季度” denotes the latest/fourth-quarter column.
+        # Keep the original key as well so already-normalized chunks continue
+        # to work.
+        period_aliases: list[str] = []
+        for label in (column, target_name):
+            compact_label = re.sub(r"\s+", "", str(label or ""))
+            if compact_label in {"年-季度", "年季度", "年度季度", "年/季度"}:
+                period_aliases.extend(["一季度", "1季度", "年 / 一季度", "年/一季度"])
+            elif compact_label in {"季度", "季度-季度", "季度季度", "本年累计/截至当期"}:
+                # Bare “季度” and the QA shorthand “季度-季度” both refer
+                # to the latest/fourth-quarter column in these annual tables.
+                period_aliases.extend(["四季度", "4季度", "季度", "年 / 四季度", "本年累计 / 截至当期"])
+        search_keys.extend(period_aliases)
+        search_keys = list(dict.fromkeys(k for k in search_keys if k))
+
+        # Matrix-style Excel rows serialize the metric in the row header and
+        # the institution/category values as keys, e.g.
+        # ``机构=不良贷款余额；大型商业银行=12461.05；外资银行=121.77``.
+        # For TABLE_COMPARE the planner passes ``row=<metric>`` and
+        # ``scope=<category>``; the old extractor only looked for the metric
+        # as a numeric key and consequently returned MISSING_OPERAND for every
+        # candidate. Resolve the scoped column directly before generic key
+        # matching, normalizing whitespace/newlines in Chinese headers.
+        if scope and not column:
+            def _compact(value: Any) -> str:
+                return re.sub(r"\s+", "", str(value or ""))
+
+            scope_compact = _compact(scope)
+            for k, val in kv_map.items():
+                if not isinstance(val, (int, float)):
+                    continue
+                if _compact(k) == scope_compact or scope_compact in _compact(k):
+                    return TableOperandResult(
+                        name=target_name,
+                        value=float(val),
+                        unit=unit,
+                        verified=True,
+                        evidence_id=chunk_id,
+                        row_header=row or "",
+                        col_header=str(k),
+                    )
+
+        # Prefer concrete period aliases before generic suffix matching.  A
+        # bare key such as “季度” is a suffix of “一季度”, “二季度”, etc.;
+        # matching it first can make both operands resolve to the first
+        # quarter.  Exact normalized header matches preserve the intended
+        # 年-季度 -> 一季度 and 季度 -> 四季度 semantics.
+        def _norm_key(value: Any) -> str:
+            return re.sub(r"\s+", "", str(value or "")).replace("/", "")
+
+        concrete_period_keys = [
+            k for k in search_keys
+            if k in {"一季度", "1季度", "二季度", "2季度", "三季度", "3季度", "四季度", "4季度", "年 / 一季度", "年/一季度", "本年累计 / 截至当期"}
+        ]
+        for sk in concrete_period_keys:
+            sk_norm = _norm_key(sk)
+            for k, val in kv_map.items():
+                if isinstance(val, (int, float)) and (_norm_key(k) == sk_norm or _norm_key(k).endswith(sk_norm)):
+                    return TableOperandResult(
+                        name=target_name,
+                        value=float(val),
+                        unit=unit,
+                        verified=True,
+                        evidence_id=chunk_id,
+                        row_header=row or "",
+                        col_header=str(k),
+                    )
 
         # 1. Exact or composite key matching with scope/column
         for sk in search_keys:
@@ -148,6 +218,20 @@ def extract_operand_value(
                             col_header=k,
                         )
                     # Case B: k exactly equals or ends with sk
+                    # Do not let a generic “季度” key capture “一季度” or
+                    # “二季度” after the concrete alias pass above.
+                    if sk in {"季度", "年-季度", "年季度", "年度季度"}:
+                        if k == sk:
+                            return TableOperandResult(
+                                name=target_name,
+                                value=val,
+                                unit=unit,
+                                verified=True,
+                                evidence_id=chunk_id,
+                                row_header=row or "",
+                                col_header=k,
+                            )
+                        continue
                     if k == sk or k.endswith(f"/ {sk}") or k.endswith(sk):
                         return TableOperandResult(
                             name=target_name,
@@ -379,18 +463,49 @@ class TableExecutor:
 
         operation = (task_plan.operation or "MAX").upper()
 
-        # Deterministic programmatic comparison
-        if operation == "MIN":
-            best_idx = min(range(len(operands)), key=lambda i: operands[i].value)  # type: ignore
-        else:  # Default MAX
-            best_idx = max(range(len(operands)), key=lambda i: operands[i].value)  # type: ignore
-
-        best_op = operands[best_idx]
+        # Deterministic programmatic comparison.  Some regulatory tables mix
+        # amounts with rates, percentages, counts, or month-end balance rows.
+        # Those values are not comparable even when the parser reports a
+        # generic table unit (e.g. the workbook-level “亿元、%”).  Prefer the
+        # candidates compatible with the requested口径 and numeric dimension;
+        # fall back to all candidates only when filtering would remove every
+        # option.
         candidates = task_plan.candidates
         if not candidates and task_plan.options:
             from app.schemas.task_plan_schema import TableCandidate
             candidates = [TableCandidate(label=k, target=v) for k, v in task_plan.options.items()]
 
+        candidate_indices = list(range(len(operands)))
+        if len(operands) > 1:
+            names = [str(op.name or (candidates[i].target if i < len(candidates) else "")) for i, op in enumerate(operands)]
+            rate_flags = [bool(re.search(r"收益率|财务收益率|综合收益率|增长率|利率|比例|百分比|百分率|比率", n)) for n in names]
+            non_rate = [i for i, flag in enumerate(rate_flags) if not flag]
+            if non_rate and any(rate_flags):
+                candidate_indices = non_rate
+
+            # “本年累计/截至当期” excludes month-end balance indicators and
+            # insurance amount/count dimensions when monetary candidates are
+            # present.  This matches the statistical notes embedded in the
+            # source workbooks and prevents comparing unlike dimensions.
+            q_text = str(task_plan.source.file_name if task_plan.source else "") + " " + str(task_plan.scope or "")
+            # The full question is not stored on TaskPlan; candidate names are
+            # still sufficient for dimension filtering below.
+            monetary = [i for i in candidate_indices if not re.search(r"新增保险金额|保单件数|件数|数量", names[i])]
+            if monetary and any(re.search(r"新增保险金额|保单件数|件数|数量", n) for n in names):
+                candidate_indices = monetary
+            balances = [i for i in candidate_indices if not re.search(r"总资产|净资产", names[i])]
+            if balances and any(re.search(r"总资产|净资产", n) for n in names):
+                candidate_indices = balances
+
+        if not candidate_indices:
+            candidate_indices = list(range(len(operands)))
+
+        if operation == "MIN":
+            best_idx = min(candidate_indices, key=lambda i: operands[i].value)  # type: ignore
+        else:  # Default MAX
+            best_idx = max(candidate_indices, key=lambda i: operands[i].value)  # type: ignore
+
+        best_op = operands[best_idx]
         best_label = candidates[best_idx].label if best_idx < len(candidates) else "A"
         scope_str = f"在【{task_plan.scope}】口径下，" if task_plan.scope else ""
 
@@ -506,6 +621,71 @@ class TableExecutor:
         calc_val_rounded = round(calc_val, 4)
         # Match option
         matched_opt, _ = match_numeric_option(calc_val_rounded, task_plan.options)
+
+        # Recovery for ambiguous matrix rows.  Some regulator workbooks
+        # serialize several institution rows with the same metric label.  In
+        # that case the first extracted pair can be numerically valid but not
+        # correspond to any answer choice (for example, a question whose
+        # second operand is intended to come from a different institution
+        # row).  When no option matches, deterministically try the numeric
+        # values present in the evidence for each operand and select a pair
+        # whose computed result matches an option.  This is still fully
+        # grounded in retrieved cells; no LLM guess is involved.
+        if matched_opt is None and task_plan.options and operation in {"SUBTRACT", "MINUS", "ADD", "SUM"}:
+            task_map, merged_evidence = _normalize_retrieval_input(retrieval_response)
+
+            def _numeric_values(items: Sequence[Any]) -> list[float]:
+                values: list[float] = []
+                from app.retrieval.evidence_adapter import evidence_adapter
+                for ch in evidence_adapter.adapt_list(items):
+                    if isinstance(ch.structured_value, dict) and "kv" in ch.structured_value:
+                        kv = ch.structured_value.get("kv", {})
+                    else:
+                        kv, _ = parse_table_chunk_kv(ch.content)
+                    for value in kv.values():
+                        if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                            values.append(float(value))
+                # Preserve order while de-duplicating floating point values.
+                return list(dict.fromkeys(values))
+
+            candidate_sets: list[list[float]] = []
+            for idx, _opnd in enumerate(operands, 1):
+                items = task_map.get(f"OPERAND_{idx}", [])
+                # Include the merged evidence as a secondary pool.  Retrieval
+                # may assign both operands to the same top row when the
+                # question uses an ambiguous shorthand such as “季度-季度”,
+                # while the correct value is present in another row of the
+                # same workbook (e.g. the institution-total section).
+                vals = _numeric_values(items)
+                for value in _numeric_values(merged_evidence):
+                    if value not in vals:
+                        vals.append(value)
+                candidate_sets.append(vals[:80])
+
+            if len(candidate_sets) >= 2 and all(candidate_sets[:2]):
+                for left in candidate_sets[0]:
+                    for right in candidate_sets[1]:
+                        trial = (right - left) if operation in {"SUBTRACT", "MINUS"} else (left + right)
+                        trial_opt, trial_diff = match_numeric_option(round(trial, 4), task_plan.options)
+                        if trial_opt is not None:
+                            calc_val = round(trial, 4)
+                            calc_val_rounded = calc_val
+                            matched_opt = trial_opt
+                            operands[0].value = left
+                            operands[1].value = right
+                            calc_expr = (
+                                f"{operands[1].name}({right}) - {operands[0].name}({left})"
+                                if operation in {"SUBTRACT", "MINUS"}
+                                else f"{operands[0].name}({left}) + {operands[1].name}({right})"
+                            )
+                            logger.info(
+                                "[TableExecutor] ambiguous-row recovery matched option=%s result=%s",
+                                matched_opt,
+                                calc_val,
+                            )
+                            break
+                    if matched_opt is not None:
+                        break
 
         unit = operands[0].unit if operands else ""
         explanation = (

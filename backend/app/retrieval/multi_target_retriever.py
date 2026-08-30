@@ -52,6 +52,12 @@ def _canonical_title(value: str | None) -> str:
     name = _normalize_document_name(value) or ""
     name = re.sub(r"[\s\u3000\-_—]+", "", name)
     name = name.replace("（", "(").replace("）", ")")
+    name = (
+        name.replace("一季度", "1季度")
+        .replace("二季度", "2季度")
+        .replace("三季度", "3季度")
+        .replace("四季度", "4季度")
+    )
     # Year may appear at either end: 2023年Foo（季度） vs Foo(季度)(2023年)
     years = re.findall(r"(?:19|20)\d{2}年", name)
     name = re.sub(r"(?:19|20)\d{2}年", "", name)
@@ -217,10 +223,56 @@ def find_matching_table_titles(
                 (f"%{family}%",),
             )
             candidates = [r[0] for r in cursor.fetchall()]
+            # Restrict family candidates to the requested year/quarter before
+            # canonical comparison. Without this, a shortened title such as
+            # “2023年4季度…” matched all four quarterly tables and the SQL
+            # loop mixed rows from different periods.
+            q_match = re.search(r"([1-4一二三四])季度", file_name)
+            if q_match:
+                q_num = {"一": "1", "二": "2", "三": "3", "四": "4"}.get(q_match.group(1), q_match.group(1))
+                q_aliases = {"1": ("1季度", "一季度"), "2": ("2季度", "二季度"), "3": ("3季度", "三季度"), "4": ("4季度", "四季度")}[q_num]
+                filtered = [
+                    t for t in candidates
+                    if any(alias in str(t) for alias in q_aliases)
+                ]
+                if filtered:
+                    candidates = filtered
             wanted = _canonical_title(file_name)
             matches = [t for t in candidates if _canonical_title(t) == wanted]
             if matches:
                 return matches
+
+            # Fall back to a token-overlap match for titles that differ only
+            # by punctuation/wording (e.g. "四季度" vs "4季度", or an
+            # attachment title that includes a parenthesized year). Require
+            # the distinctive family phrase plus the requested year when one
+            # is present, avoiding unrelated tables with the same sheet name.
+            compact_file = re.sub(r"[\s（）()\-_—]", "", file_name)
+            year = re.search(r"(?:19|20)\d{2}", file_name)
+            family_tokens = [t for t in re.findall(r"[\u4e00-\u9fffA-Za-z]{2,}", compact_file) if t not in {"季度", "情况表"}]
+            cursor.execute("SELECT DISTINCT title FROM chunks WHERE chunk_type='table'")
+            broad = [r[0] for r in cursor.fetchall()]
+            scored: list[tuple[int, str]] = []
+            for title in broad:
+                ct = re.sub(r"[\s（）()\-_—]", "", str(title or ""))
+                score = sum(1 for tok in family_tokens if tok and tok in ct)
+                if year and year.group(0) in ct:
+                    score += 2
+                if score >= max(2, len(family_tokens) // 2):
+                    scored.append((score, title))
+            if scored:
+                best_score = max(score for score, _ in scored)
+                # Keep only the best title family; returning every partial
+                # overlap can mix adjacent quarters/documents and corrupt
+                # deterministic comparisons.
+                selected = [t for score, t in sorted(scored, reverse=True) if score >= best_score][:8]
+                if q_match:
+                    q_num = {"一": "1", "二": "2", "三": "3", "四": "4"}.get(q_match.group(1), q_match.group(1))
+                    q_aliases = {"1": ("1季度", "一季度"), "2": ("2季度", "二季度"), "3": ("3季度", "三季度"), "4": ("4季度", "四季度")}[q_num]
+                    q_selected = [t for t in selected if any(alias in str(t) for alias in q_aliases)]
+                    if q_selected:
+                        selected = q_selected
+                return selected
 
         # 2. Synonyms & Quarter normalizations
         if file_name:
@@ -503,15 +555,68 @@ class MultiTargetRetriever:
                     r[0] for r in rows
                     if not year_text or year_text in str(r[0]) or year_text in str(r[0]).replace("年", "")
                 ] or [r[0] for r in rows]
+
+            # A user often cites the regulator's attachment/source-page title
+            # while table chunks store the workbook attachment title (or vice
+            # versa).  When fuzzy title matching cannot produce a SQL title,
+            # resolve the document through the parsed manifest and constrain
+            # retrieval by doc_id.  This preserves the exact workbook even
+            # when names differ substantially, e.g.:
+            #   2023年银行业总资产、总负债（季度）
+            #   银行业金融机构资产负债情况表(季度)
+            fallback_doc_ids = _find_document_ids(self.db_path, file_name)
+            # `_find_document_ids` may return an attachment and its source
+            # page sibling.  For tables, prefer the workbook attachment ID;
+            # source-page siblings generally contain only narrative chunks.
+            if fallback_doc_ids:
+                fallback_doc_ids = [doc_id for doc_id in fallback_doc_ids if str(doc_id).startswith("nfra_att_")] or fallback_doc_ids
+            # If the requested table title is a shortened variant and a
+            # matching sheet/title family exists, keep only the best title
+            # family instead of broadening to every table on that sheet.
+            if matched_titles and file_name:
+                requested_year = re.search(r"(?:19|20)\d{2}", file_name or "")
+                requested_family = re.sub(r"(?:19|20)\d{2}年", "", file_name)
+                requested_family = re.sub(r"[（(].*?[）)]", "", requested_family)
+                def _title_score(title: str) -> int:
+                    compact = re.sub(r"[\s（）()\-_—]", "", str(title or ""))
+                    fam = re.sub(r"[\s（）()\-_—]", "", requested_family)
+                    score = 1 if fam and fam in compact else 0
+                    if requested_year and requested_year.group(0) in compact:
+                        score += 2
+                    if "保险业资金运用情况表" in compact:
+                        score += 2
+                    quarter_aliases = {
+                        "1": ("一季度", "1季度"), "2": ("二季度", "2季度"),
+                        "3": ("三季度", "3季度"), "4": ("四季度", "4季度"),
+                    }
+                    q_match = re.search(r"([1-4一二三四])季度", file_name or "")
+                    if q_match:
+                        q_num = {"一": "1", "二": "2", "三": "3", "四": "4"}.get(q_match.group(1), q_match.group(1))
+                        if any(alias in compact for alias in quarter_aliases[q_num]):
+                            score += 3
+                    return score
+                best = max((_title_score(t) for t in matched_titles), default=0)
+                if best:
+                    matched_titles = [t for t in matched_titles if _title_score(t) == best]
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             try:
                 # Build target search conditions
                 terms_to_match = [t for t in (cand_target, row_target, col_target, target) if t]
-                for title in matched_titles:
-                    where_clauses = ["chunk_type='table'", "title = ?"]
-                    params: list[Any] = [title]
+                # Manifest-resolved doc_ids are authoritative.  A fuzzy title
+                # query can otherwise return a same-sheet table from another
+                # period (for example a monthly table when the user requested
+                # a quarterly workbook), so prefer the exact document IDs
+                # whenever available.
+                if fallback_doc_ids:
+                    title_iter = [("doc_id", doc_id) for doc_id in fallback_doc_ids]
+                else:
+                    title_iter = [("title", title) for title in matched_titles]
+
+                for title_field, title_value in title_iter:
+                    where_clauses = ["chunk_type='table'", f"{title_field} = ?"]
+                    params: list[Any] = [title_value]
 
                     if sheet_name:
                         clean_sheet = sheet_name.replace("（月度）", "").replace("(月度)", "").replace("（季度）", "").replace("(季度)", "").strip()
@@ -667,6 +772,9 @@ class MultiTargetRetriever:
         """Execute standard direct fact retrieval."""
         doc_name = _normalize_document_name(task.source_constraints.get("document_name"))
         filters = {"title": doc_name} if doc_name else {}
+        doc_ids = _preferred_document_ids(self.db_path, doc_name)
+        if doc_ids:
+            filters = {"doc_id": doc_ids[0]}
         evidence = self.reader.search(
             task.target,
             top_k=top_k,

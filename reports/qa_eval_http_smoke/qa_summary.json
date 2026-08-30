@@ -1,0 +1,20 @@
+{
+  "total": 1,
+  "answered": 1,
+  "refused": 0,
+  "correct": 1,
+  "wrong_answered": 0,
+  "accuracy_over_all": 1.0,
+  "accuracy_over_answered": 1.0,
+  "refused_ids": [],
+  "wrong_ids": [],
+  "by_qa_type": {
+    "表格取数": {
+      "total": 1,
+      "answered": 1,
+      "refused": 0,
+      "correct": 1,
+      "wrong": 0
+    }
+  }
+}
